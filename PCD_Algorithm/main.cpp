@@ -14,10 +14,10 @@
 #include "defs.h"
 #include "Intrinsic.hpp"
 #include "Distortion.hpp"
-#ifdef debug
-#include <pcl/visualization/pcl_visualizer.h>
-#include <pcl/io/io.h>
-#include <pcl/io/pcd_io.h>
+#ifdef debugPCD
+//#include <pcl/visualization/pcl_visualizer.h>
+//#include <pcl/io/io.h>
+//#include <pcl/io/pcd_io.h>
 #endif
 
 using namespace std;
@@ -251,6 +251,10 @@ void PCDColorize(PCDPtr pcd, int R, int G, int B)
 	pcd = outPCD;
 }
 
+#ifdef debugPCD
+
+int user_data = 0;
+
 void viewerOneOff(pcl::visualization::PCLVisualizer& viewer)
 {
 	viewer.setBackgroundColor(1.0, 0.5, 1.0);
@@ -260,7 +264,6 @@ void viewerOneOff(pcl::visualization::PCLVisualizer& viewer)
 	o.z = 0;
 	viewer.addSphere(o, 0.25, "sphere", 0);
 	std::cout << "i only run once" << std::endl;
-
 }
 
 void viewerPsycho(pcl::visualization::PCLVisualizer& viewer)
@@ -272,9 +275,11 @@ void viewerPsycho(pcl::visualization::PCLVisualizer& viewer)
 	viewer.addText(ss.str(), 200, 300, "text", 0);
 
 	//FIXME: possible race condition here:
-	//user_data++;
-}
+	while ((user_data+1) % 2) {}
 
+	user_data++;
+}
+#endif
 void imgPath(std::string* workpath, std::string* depth_name, std::string* amplitude_name)
 {
 
@@ -339,7 +344,7 @@ int main()
 		}
 
 		cv::cvtColor(depth_image_u, depth_image_1c, CV_BGR2GRAY);//depth_image was an RGB, with same RGBpixel values -> greyscale
-		depth_image_u.convertTo(depth_image, CV_32F);
+		depth_image_1c.convertTo(depth_image, CV_32F);
 		
 		//SZURES
 		cv::Mat median_res, gaussian_res;
@@ -365,11 +370,16 @@ int main()
 		std::string imgType = "DImage";
 		std::string coordinateSys = "OpenGL";
 		pcdThis = DepthToPCD(gaussian_res, intrinsic, distortion, imgType, coordinateSys);
+		if (pcdThis == NULL)
+		{
+			cout << "PCD is nullpointer" << endl;
+			return -1;
+		}
 		PCDColorize(pcdThis, 255, 255, 255);
 
 
 		//PCD MEGJELENITES
-#ifdef debug
+#ifdef debugPCD
 		pcl::visualization::CloudViewer viewer("Simple Cloud Viewer");
 		viewer.showCloud(pcdThis);
 
@@ -385,7 +395,8 @@ int main()
 			//you can also do cool processing here
 			//FIXME: Note that this is running in a separate thread from viewerPsycho
 			//and you should guard against race conditions yourself...
-			//user_data++;
+			while ((user_data) % 2) {}
+			user_data++;
 		}
 #endif
 		//KOZOS PCD
@@ -430,7 +441,7 @@ int main()
 
 
 #ifdef debug
-		cv::imshow("Depth", depth_image_1c); // Show our image inside it.
+		//Visualization part
 #endif
 		loader_iter++;
 	}

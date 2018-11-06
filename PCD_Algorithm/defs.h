@@ -1,6 +1,7 @@
 #pragma once
 
 //#define debug
+#define debugPCD
 
 //#define Tanszekiervin
 //#define Enexport
