@@ -583,7 +583,7 @@ int main()
 		{
 		}
 		 //*/
-		/*
+		/*checkthis
 		viewer.runOnVisualizationThreadOnce(viewerOneOff);
 		viewer.runOnVisualizationThread(viewerPsycho);
 		while (!viewer.wasStopped())
