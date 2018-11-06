@@ -10,13 +10,15 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/ModelCoefficients.h> 
+#include <pcl/visualization/cloud_viewer.h>
 #include "defs.h"
 #include "Intrinsic.hpp"
 #include "Distortion.hpp"
-#include <pcl/visualization/cloud_viewer.h>
-//#include <pcl/visualization/pcl_visualizer.h>
-//#include <pcl/io/io.h>
-//#include <pcl/io/pcd_io.h>
+#ifdef debug
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/io/io.h>
+#include <pcl/io/pcd_io.h>
+#endif
 
 using namespace std;
 
@@ -248,7 +250,7 @@ void PCDColorize(PCDPtr pcd, int R, int G, int B)
 	}
 	pcd = outPCD;
 }
-/*
+
 void viewerOneOff(pcl::visualization::PCLVisualizer& viewer)
 {
 	viewer.setBackgroundColor(1.0, 0.5, 1.0);
@@ -272,242 +274,39 @@ void viewerPsycho(pcl::visualization::PCLVisualizer& viewer)
 	//FIXME: possible race condition here:
 	//user_data++;
 }
-*/
-/*
-void graphCut(cv::Mat inAmpitude, cv::Mat inDepth, cv::Mat* outBin)
+
+void imgPath(std::string* workpath, std::string* depth_name, std::string* amplitude_name)
 {
-	int* maxidx = 0;
-	int* minidx = 0;
-	double maxval, minval;
-	cv::minMaxIdx(inDepth, &minval, &maxval, minidx, maxidx, cv::noArray());
-
-	//PFGD create
-	cv::Mat hist;
-	int histSize = 256;
-	float range[] = { 0, 255 };
-	const float* histRange = { range };
-	cv::calcHist(&inDepth, 1, 0, cv::Mat(), hist, 1, &histSize, &histRange);
-
-	int thresh;
-	double sum = 0.0;
-	for (int i = 0; i < histSize; i++)
-	{
-		sum += hist.at<float>(i, 0);
-
-		if (sum >= inDepth.cols*inDepth.rows*0.4)
-		{
-			thresh = i;
-			break;
-		}
-	}
-	cv::Mat maskPFGD, _maskPFGD;
-	cv::threshold(inDepth, maskPFGD, thresh, 3, cv::THRESH_BINARY_INV);
-	cv::dilate(maskPFGD, _maskPFGD, cv::Mat(), cv::Point(-1, -1), 3);
-	cv::erode(_maskPFGD, maskPFGD, cv::Mat(), cv::Point(-1, -1), 3);
-	//PFGD kész
-
-	//PBGD create
-	cv::Mat maskPBGD;
-	cv::bitwise_not(maskPFGD, maskPBGD);
-	maskPBGD -= 253; //(~(uchar)3)+1
-					 //PBGD kész
-
-					 //FGD create
-#ifdef Tanszekiervin
-	cv::Mat thresholdedFRONT, thresholdedERROR_, thresholdedERROR;
-	cv::threshold(inDepth, thresholdedERROR_, minval, 1, cv::THRESH_BINARY_INV);
-	cv::dilate(thresholdedERROR_, thresholdedERROR, cv::Mat(), cv::Point(-1, -1), 5);
-	cv::threshold(inDepth, thresholdedFRONT, minval + 6, 1, cv::THRESH_BINARY_INV);
-	cv::Mat maskFGD_;
-	maskFGD_ = thresholdedFRONT - thresholdedERROR;
-#else
-	cv::Mat maskFGD_;
-	sum = 0.0;
-	for (int i = 0; i < histSize; i++)
-	{
-		sum += hist.at<float>(i, 0);
-
-		if (sum >= inDepth.cols*inDepth.rows*0.04)
-		{
-			thresh = i;
-			break;
-		}
-	}
-	cv::threshold(inDepth, maskFGD_, thresh, 1, cv::THRESH_BINARY_INV);
-#endif
-
-	std::vector<std::vector<cv::Point> > contours;
-	std::vector<cv::Vec4i> hierarchy;
-	cv::Mat maskFGD;
-	cv::dilate(maskFGD_, maskFGD, cv::Mat(), cv::Point(-1, -1), 5);
-	cv::erode(maskFGD, maskFGD_, cv::Mat(), cv::Point(-1, -1), 5);
-	cv::findContours(maskFGD_, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
-	maskFGD_ -= 1;
-
-	for (int i = 0; i < contours.size(); i++)
-		if (cv::contourArea(contours[i]) > 1000)
-			cv::drawContours(maskFGD_, contours, i, 2, CV_FILLED);
-
-	cv::erode(maskFGD_, maskFGD, cv::Mat(), cv::Point(-1, -1), 10);
-	//FGD kész
-
-	//BGD create
-	cv::Mat maskBGD, maskBGD_;
-	sum = 0.0;
-	for (int i = 0; i < histSize; i++)
-	{
-		sum += hist.at<float>(i, 0);
-
-		if (sum >= inDepth.cols*inDepth.rows*0.96)
-		{
-			thresh = i;
-			break;
-		}
-	}
-	cv::threshold(inDepth, maskBGD_, thresh, 1, cv::THRESH_BINARY);
-	cv::dilate(maskBGD_, maskBGD, cv::Mat(), cv::Point(-1, -1), 5);
-	cv::erode(maskBGD, maskBGD_, cv::Mat(), cv::Point(-1, -1), 15);
-
-	//BGD kész
-
-	//Final sums
-	cv::Mat maskF;
-	maskF = maskPFGD - maskFGD;
-
-	cv::Mat maskB;
-	maskB = maskPBGD - maskBGD;
-
-	cv::Mat mask = maskB + maskF;
-	//--------------------------------------------------------------------------------------
-	cv::MatIterator_<uchar> m_it, m_end;
-#pragma omp for
-	for (m_it = mask.begin<uchar>(), m_end = mask.end<uchar>(); m_it != m_end; ++m_it)
-	{
-		if (*m_it != 1)
-			*m_it = 0;
-	}
-	*outBin = mask;
-	return;
-	//------------------------------------------------------------------------------------------
-	//GRABCUT
-	cv::Mat bgdModel, fgdModel;
-	cv::grabCut(inAmpitude, mask, cv::Rect(), bgdModel, fgdModel, 1, cv::GrabCutModes::GC_INIT_WITH_MASK);
-
-	//	cv::MatIterator_<uchar> m_it, m_end;
-#pragma omp for
-	for (m_it = mask.begin<uchar>(), m_end = mask.end<uchar>(); m_it != m_end; ++m_it)
-	{
-		if (*m_it != 1)
-			*m_it = 0;
-	}
-	cv::MatIterator_<cv::Vec3b> it, end;
-#pragma omp for
-	for (m_it = mask.begin<uchar>(), it = inAmpitude.begin<cv::Vec3b>(), end = inAmpitude.end<cv::Vec3b>(); it != end; ++it, ++m_it)
-	{
-		(*it)[0] *= *m_it;
-		(*it)[1] *= *m_it;
-		(*it)[2] *= *m_it;
-	}
-	inAmpitude.copyTo(*outBin);
-	return;
-}
-
-void waterShed(cv::Mat inAmpitude, cv::Mat inDepth, cv::Mat* outImg)
-{
-	cv::Mat img_a, img_b;
-	cv::medianBlur(inDepth, img_a, 3);
-	cv::GaussianBlur(img_a, img_b, cv::Size(3, 3), 0.6);
-	cv::adaptiveThreshold(img_b, img_a, 255, cv::AdaptiveThresholdTypes::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV, 21, 0);
-	cv::distanceTransform(img_a, img_b, cv::DistanceTypes::DIST_L2, cv::DistanceTransformMasks::DIST_MASK_3, 5);
-
-	int* maxidx = 0;
-	int* minidx = 0;
-	double maxval, minval;
-	cv::minMaxIdx(img_b, &minval, &maxval, minidx, maxidx, cv::noArray());
-
-	cv::threshold(img_b, img_a, maxval*0.4, 255, cv::THRESH_BINARY);
-
-	img_a.convertTo(img_b, CV_8U);
-	cv::dilate(img_b, img_a, cv::Mat(), cv::Point(-1, -1), 3);
-	cv::erode(img_a, img_b, cv::Mat(), cv::Point(-1, -1), 5);
-	std::vector<std::vector<cv::Point> > contours, valid_contours;
-	std::vector<cv::Vec4i> hierarchy;
-	cv::findContours(img_b, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
-	img_b *= 0;
-	int to = contours.size() < 3 ? contours.size() : 3;
-	for (int are = 0; are < to; are++)
-	{
-		valid_contours.push_back(contours[0]);
-		for (int i = 0; i < contours.size(); i++)
-		{
-			if (are == 0)
-			{
-				if (cv::contourArea(valid_contours[are]) < cv::contourArea(contours[i]))
-				{
-					valid_contours[are] = contours[i];
-				}
-			}
-			else if (are == 1)
-			{
-				if (cv::contourArea(valid_contours[are]) < cv::contourArea(contours[i]) && cv::contourArea(valid_contours[0]) != cv::contourArea(contours[i]))
-				{
-					valid_contours[are] = contours[i];
-				}
-			}
-			else
-			{
-				if (cv::contourArea(valid_contours[are]) < cv::contourArea(contours[i]) && cv::contourArea(valid_contours[0]) != cv::contourArea(contours[i]) && cv::contourArea(valid_contours[1]) != cv::contourArea(contours[i]))
-				{
-					valid_contours[are] = contours[i];
-				}
-			}
-		}
-		drawContours(img_b, valid_contours, are, cv::Scalar({ are + 1.0,are + 1.0,are + 1.0 }), CV_FILLED, 8, cv::noArray(), 0, cv::Point(0, 0));
-	}
-
-	*outImg = inAmpitude;
-	img_b.convertTo(img_a, CV_32SC1);
-	cv::watershed(*outImg, img_a);
-	img_a.convertTo(img_b, CV_8UC1);
-	img_b -= 1;
-	cv::MatIterator_<uchar> m_it;
-	cv::MatIterator_<cv::Vec3b> it, end;
-#pragma omp for
-	for (m_it = img_b.begin<uchar>(), it = outImg->begin<cv::Vec3b>(), end = outImg->end<cv::Vec3b>(); it != end; ++it, ++m_it)
-	{
-		(*it)[0] *= *m_it;
-		(*it)[1] *= *m_it;
-		(*it)[2] *= *m_it;
-	}
-}
-*/
-
-int main()
-{
-	string workpath, depth_name, amplitude_name;
 
 #ifdef Tanszekiervin
-	workpath = "D:/OneDrive/Visual studio/defkepek/Tanszekiervin/";
-	depth_name = "013654251447_depth_";
-	amplitude_name = "013654251447_rgb_";
+	*workpath = "D:/OneDrive/Visual studio/defkepek/Tanszekiervin/";
+	*depth_name = "013654251447_depth_";
+	*amplitude_name = "013654251447_rgb_";
 #endif
 
 #ifdef Ervinexport
-	workpath = "D:/OneDrive/Visual studio/defkepek/Ervinexport/";
-	depth_name = "depth_" + std::to_string(CAM_NUM) + "_";
-	amplitude_name = "ampli_" + std::to_string(CAM_NUM) + "_";
+	*workpath = "D:/OneDrive/Visual studio/defkepek/Ervinexport/";
+	*depth_name = "depth_" + std::to_string(CAM_NUM) + "_";
+	*amplitude_name = "ampli_" + std::to_string(CAM_NUM) + "_";
 #endif
 
 #ifdef Enexport
-	workpath = "D:/OneDrive/Visual studio/defkepek/Enexport/";
-	depth_name = "013654251447_depth_";
-	amplitude_name = "013654251447_rgb_";
+	*workpath = "D:/OneDrive/Visual studio/defkepek/Enexport/";
+	*depth_name = "013654251447_depth_";
+	*amplitude_name = "013654251447_rgb_";
 #endif
 
 #ifdef Zinemath
-	workpath = "D:/OneDrive/Visual studio/defkepek/Somi/";
-	depth_name = "image";
+	*workpath = "D:/OneDrive/Visual studio/defkepek/Somi/";
+	*depth_name = "image";
 #endif
+}
+
+int main()
+{
+	std::string workpath, depth_name, amplitude_name;
+	imgPath(&workpath, &depth_name, &amplitude_name);
+
 	int loader_iter = ITERATOR_MIN;
 	PCDPtr pcdThis,pcdBefore;
 
@@ -525,9 +324,9 @@ int main()
 		string workpath_dimg = workpath + "Depth/" + camNumPath + depth_name + image_name;
 		string workpath_rgbimg = workpath + "RGB/" + camNumPath + amplitude_name + image_name;
 
-		cv::Mat depth_image_u, depth_image_f, depth_image_1c, rgb_img; //depth_image_, rgb_img
-		depth_image_u = cv::imread(workpath_dimg); // Read the file
-		rgb_img = cv::imread(workpath_rgbimg); // Read the file
+		cv::Mat depth_image_u, depth_image, depth_image_1c, rgb_img; //depth_image_, rgb_img
+		depth_image_u = cv::imread(workpath_dimg); // Read img to unsigned
+		rgb_img = cv::imread(workpath_rgbimg); // Read img to unsigned
 		if (depth_image_u.empty()) // Check for invalid input
 		{
 			cout << "Could not open or find the depth image" << std::endl;
@@ -538,29 +337,24 @@ int main()
 			cout << "Could not open or find the RGB image" << std::endl;
 			return -1;
 		}
-		type_debug(depth_image_u);
-		depth_image_u.convertTo(depth_image_f, CV_32F);
-		type_debug(depth_image_f);
-		cv::cvtColor(depth_image_f, depth_image_1c, CV_BGR2GRAY);//depth_image was an RGB, with same RGBpixel values -> greyscale
-		type_debug(depth_image_1c);
+
+		cv::cvtColor(depth_image_u, depth_image_1c, CV_BGR2GRAY);//depth_image was an RGB, with same RGBpixel values -> greyscale
+		depth_image_u.convertTo(depth_image, CV_32F);
 		
-#ifdef debug
-		//type_debug(rgb_img);
-		cv::imshow("Depth", depth_image_1c); // Show our image inside it.
-		//cv::waitKey(0); // Wait for a keystroke in the window
-#endif
 		//SZURES
 		cv::Mat median_res, gaussian_res;
-		cv::medianBlur(depth_image_1c, median_res, 3);
+		cv::medianBlur(depth_image, median_res, 3);
 		cv::GaussianBlur(median_res, gaussian_res, cv::Size(3, 3), 1.8);
 
-		//ELOZO PCD KITERJESZTES
+		//ELOZO PCD MENTES
 		if (loader_iter - ITERATOR_MIN > 1)
 		{
 			pcdBefore = pcdThis; //"Before": all before, "this": from this depth img.
 		}
 
 		//ATLAGOLAS
+		//??
+
 		//PCD KESZITES
 			/*
 				<item key="distorsion" type="Distortion" encoding="text">-0.40322 0.706050 0.001742 -0.002878 -1.370257</item>
@@ -571,19 +365,19 @@ int main()
 		std::string imgType = "DImage";
 		std::string coordinateSys = "OpenGL";
 		pcdThis = DepthToPCD(gaussian_res, intrinsic, distortion, imgType, coordinateSys);
-
-		//KOZOS PCD
-
 		PCDColorize(pcdThis, 255, 255, 255);
+
+
+		//PCD MEGJELENITES
+#ifdef debug
 		pcl::visualization::CloudViewer viewer("Simple Cloud Viewer");
 		viewer.showCloud(pcdThis);
 
-		///*
+		/*
 		while (!viewer.wasStopped())
 		{
 		}
-		 //*/
-		/*checkthis
+		 */
 		viewer.runOnVisualizationThreadOnce(viewerOneOff);
 		viewer.runOnVisualizationThread(viewerPsycho);
 		while (!viewer.wasStopped())
@@ -593,7 +387,9 @@ int main()
 			//and you should guard against race conditions yourself...
 			//user_data++;
 		}
-		*/
+#endif
+		//KOZOS PCD
+		
 		//cv::resize(amplitude_image_, amplitude_image, cv::Size(1920, 1080), 0, 0, cv::INTER_LINEAR);
 		//cv::Mat depth_image;
 		//cv::resize(dpt_image, depth_image, cv::Size(amplitude_image.cols, amplitude_image.rows), 0, 0, cv::INTER_LINEAR);
@@ -603,15 +399,13 @@ int main()
 		//Szures
 			//melyseg gauss
 			//melyseg median??
-		//Atlagolas
 			//amplitudo hisztogram
-			//melyseg atlagolas
-		//PDC [kerdezni]
+		//PCD
 			//pontfelho keszites
-		//KozosPCD [olvasni]
-			//kozos pontfelhobe helyezes
-		//PCD ATLAGOLAS!!! (magic) [olvasni]
-			//kozos pontfelho igazitasa
+		//KozosPCD
+			//Iterative closest point
+		//
+		
 
 
 		//-------------kibaszott meres ------------------------//
@@ -620,46 +414,21 @@ int main()
 		int64 e1;
 		int64 e2;
 		double time;
-
 		e1 = cvGetTickCount();
+
+
+
 		//Insert algorithm here!
+
+
+
+
 		e2 = cvGetTickCount();
 		time = (e2 - e1) / freq;
 		cout << time << " sec volt a futasi ido" << endl;
 		*/
 
 
-
-
-
-
-
-		//--------------melyseglyukasztas----------------------//
-		/*
-		//cv::Mat grabCut_out = cv::Mat(amplitude_image.cols, amplitude_image.rows, CV_8UC1);
-		//e1 = cvGetTickCount();
-		//graphCut(amplitude_image, depth_image, &grabCut_out);
-		//e2 = cvGetTickCount();
-		//time = (e2 - e1) / freq;
-		//cout << time << " sec volt a futasi ido GC" << endl;
-		//cv::namedWindow("grabCut_out", cv::WINDOW_NORMAL); // Create a window for display.
-		//cv::imshow("grabCut_out", grabCut_out); // Show our image inside it.
-		//cv::Mat mask;
-		//cv::resize(grabCut_out, mask, cv::Size(amplitude_image_.cols, amplitude_image_.rows), 0, 0, cv::INTER_LINEAR);
-		//cv::imwrite(workpath + "mask" + image_name, mask);
-		//cv::waitKey(0); // Wait for a keystroke in the window
-		
-		cv::Mat watershedOut = cv::Mat(amplitude_image.cols, amplitude_image.rows, CV_8UC3);
-		e1 = cvGetTickCount();
-		waterShed(amplitude_image, depth_image, &watershedOut);
-		e2 = cvGetTickCount();
-		time = (e2 - e1) / freq;
-		cout << time << " sec volt a futasi ido WS" << endl;
-		cv::imshow("Watershed Out", watershedOut); // Show our image inside it.
-		cv::waitKey(0); // Wait for a keystroke in the window
-		//cv::imwrite(workpath + "watershed" + image_name, watershedOut);
-		*/
-		//--------------melyseglyukasztas----------------------//
 #ifdef debug
 		cv::imshow("Depth", depth_image_1c); // Show our image inside it.
 #endif

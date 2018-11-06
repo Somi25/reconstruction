@@ -1,7 +1,6 @@
 #pragma once
 
-#define debug
-#define M_PI 3.141572
+//#define debug
 
 //#define Tanszekiervin
 //#define Enexport
@@ -25,6 +24,10 @@
 
 #ifdef Ervinexport
 #define CAM 1
+#define ITERATOR_MAX 694
+#define ITERATOR_MIN 0
+
+
 #if CAM 1
 #define CAM_NUM 916056915768
 #else
@@ -34,6 +37,4 @@
 #define CAM_NUM 916073915802
 #endif
 #endif
-#define ITERATOR_MAX 694
-#define ITERATOR_MIN 0
 #endif
