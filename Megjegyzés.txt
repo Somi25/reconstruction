@@ -1,0 +1,8 @@
+nem talált libek
+
+vtkFiltersGeneric-8.0-gd.lib	-filtersben
+vtkHybrid-gd.lib		-imagingben
+vtkVolumeRendering-gd.lib	-renderingben
+vtkWidgets-gd.lib		-Interactionsben
+vtkGraphics-gd.lib
+QVTK-gd.lib
