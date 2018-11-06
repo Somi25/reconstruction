@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="PCD_debug|Win32">
+      <Configuration>PCD_debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="PCD_debug|x64">
+      <Configuration>PCD_debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{8BAAD9DC-9285-4704-8A1B-601DDF3B389D}</ProjectGuid>
+    <RootNamespace>PCDAlgorithm</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='PCD_debug|Win32'">
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='PCD_debug|x64'">
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ReferencePath>$(ReferencePath)</ReferencePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(OPENCV_342)\..\..\include;C:\Program Files\PCL 1.8.1\3rdParty\VTK\include\vtk-8.0;C:\Program Files\PCL 1.8.1\3rdParty\Qhull\include;C:\Program Files\PCL 1.8.1\3rdParty\FLANN\include;C:\Program Files\PCL 1.8.1\3rdParty\Eigen\eigen3;C:\Program Files\PCL 1.8.1\3rdParty\Boost\include\boost-1_64;C:\Program Files\PCL 1.8.1\include\pcl-1.8;C:\Program Files\OpenNI2\Include;C:\Qt\Tools\QtCreator</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OPENCV_342)\lib;C:\Program Files\PCL 1.8.1\3rdParty\VTK\lib;C:\Program Files\PCL 1.8.1\3rdParty\Qhull\lib;C:\Program Files\PCL 1.8.1\3rdParty\FLANN\lib;C:\Program Files\PCL 1.8.1\3rdParty\Boost\lib;C:\Program Files\PCL 1.8.1\lib;C:\Program Files\PCL 1.8.1\lib\$(Configuration);C:\Qt\Tools\QtCreator\lib;C:\Program Files\OpenNI2\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_world342d.lib;openNI2.lib;libboost_system-vc141-mt-gd-1_64.lib;libboost_filesystem-vc141-mt-gd-1_64.lib;libboost_thread-vc141-mt-gd-1_64.lib;libboost_date_time-vc141-mt-gd-1_64.lib;libboost_iostreams-vc141-mt-gd-1_64.lib;pcl_common_debug.lib;pcl_features_debug.lib;pcl_filters_debug.lib;pcl_io_debug.lib;pcl_io_ply_debug.lib;pcl_kdtree_debug.lib;pcl_keypoints_debug.lib;pcl_ml_debug.lib;pcl_octree_debug.lib;pcl_outofcore_debug.lib;pcl_people_debug.lib;pcl_recognition_debug.lib;pcl_registration_debug.lib;pcl_sample_consensus_debug.lib;pcl_search_debug.lib;pcl_segmentation_debug.lib;pcl_stereo_debug.lib;pcl_surface_debug.lib;pcl_tracking_debug.lib;pcl_visualization_debug.lib;vtkalglib-8.0-gd.lib;vtkChartsCore-8.0-gd.lib;vtkCommonCore-8.0-gd.lib;vtkDICOMParser-8.0-gd.lib;vtkexoIIc-8.0-gd.lib;vtkexpat-8.0-gd.lib;vtkFiltersCore-8.0-gd.lib;vtkfreetype-8.0-gd.lib;vtkGeovisCore-8.0-gd.lib;vtkgl2ps-8.0-gd.lib;vtkhdf5-8.0-gd.lib;vtkImagingCore-8.0-gd.lib;vtkInfovisCore-8.0-gd.lib;vtkIOCore-8.0-gd.lib;vtkjpeg-8.0-gd.lib;vtklibxml2-8.0-gd.lib;vtkmetaio-8.0-gd.lib;vtknetcdf_c++-gd.lib;vtkNetCDF-8.0-gd.lib;vtkpng-8.0-gd.lib;vtkproj4-8.0-gd.lib;vtkRenderingCore-8.0-gd.lib;vtksqlite-8.0-gd.lib;vtksys-8.0-gd.lib;vtktiff-8.0-gd.lib;vtkverdict-8.0-gd.lib;vtkViewsCore-8.0-gd.lib;vtkzlib-8.0-gd.lib;OpenGL32.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(OPENCV_342)\..\..\include;C:\Program Files\PCL 1.8.1\3rdParty\VTK\include\vtk-8.0;C:\Program Files\PCL 1.8.1\3rdParty\Qhull\include;C:\Program Files\PCL 1.8.1\3rdParty\FLANN\include;C:\Program Files\PCL 1.8.1\3rdParty\Eigen\eigen3\Eigen;C:\Program Files\PCL 1.8.1\3rdParty\Boost\include;C:\Program Files\PCL 1.8.1\3rdParty;C:\Program Files\PCL 1.8.1\include\pcl-1.8;C:\Program Files\OpenNI2\Include;C:\Qt\Tools\QtCreator</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(OPENCV_342)\lib;C:\Program Files\PCL 1.8.1\3rdParty\VTK\lib;C:\Program Files\PCL 1.8.1\3rdParty\Qhull\lib;C:\Program Files\PCL 1.8.1\3rdParty\FLANN\lib;C:\Program Files\PCL 1.8.1\3rdParty\Boost\lib;C:\Program Files\PCL 1.8.1\lib;C:\Program Files\PCL 1.8.1\lib\$(Configuration);C:\Qt\Tools\QtCreator\lib;C:\Program Files\OpenNI2\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_world342.lib;openNI.lib;libboost_system-vc100-mt-gd-1_49.lib;libboost_filesystem-vc100-mt-gd-1_49.lib;libboost_thread-vc100-mt-gd-1_49.lib;libboost_date_time-vc100-mt-gd-1_49.lib;libboost_iostreams-vc100-mt-gd-1_49.lib;pcl_common_debug.lib;pcl_apps_debug.lib;pcl_features_debug.lib;pcl_filters_debug.lib;pcl_io_debug.lib;pcl_io_ply_debug.lib;pcl_kdtree_debug.lib;pcl_keypoints_debug.lib;pcl_octree_debug.lib;pcl_registration_debug.lib;pcl_sample_consensus_debug.lib;pcl_search_debug.lib;pcl_segmentation_debug.lib;pcl_surface_debug.lib;pcl_tracking_debug.lib;pcl_visualization_debug.lib;vtkRendering-gd.lib;QVTK-gd.lib;vtkalglib-gd.lib;vtkCharts-gd.lib;vtkCommon-gd.lib;vtkDICOMParser-gd.lib;vtkexoIIc-gd.lib;vtkexpat-gd.lib;vtkFiltering-gd.lib;vtkfreetype-gd.lib;vtkftgl-gd.lib;vtkGenericFiltering-gd.lib;vtkGeovis-gd.lib;vtkGraphics-gd.lib;vtkhdf5-gd.lib;vtkHybrid-gd.lib;vtkImaging-gd.lib;vtkInfovis-gd.lib;vtkIO-gd.lib;vtkjpeg-gd.lib;vtklibxml2-gd.lib;vtkmetaio-gd.lib;vtkNetCDF_cxx-gd.lib;vtkNetCDF-gd.lib;vtkpng-gd.lib;vtkproj4-gd.lib;vtksqlite-gd.lib;vtksys-gd.lib;vtktiff-gd.lib;vtkverdict-gd.lib;vtkViews-gd.lib;vtkVolumeRendering-gd.lib;vtkWidgets-gd.lib;vtkzlib-gd.lib;OpenGL32.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="Distortion.cpp" />
+    <ClCompile Include="Intrinsic.cpp" />
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="defs.h" />
+    <ClInclude Include="Distortion.hpp" />
+    <ClInclude Include="Intrinsic.hpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
