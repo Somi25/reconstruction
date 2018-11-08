@@ -133,8 +133,8 @@ void type_debug(cv::Mat in)
 }
 
 typedef pcl::PointXYZRGB PCDPoint;
-typedef pcl::PointCloud<pcl::PointXYZRGB> PCD;
-typedef boost::shared_ptr<PCD> PCDPtr;
+typedef pcl::PointCloud<PCDPoint> PCD;
+typedef PCD::Ptr PCDPtr;
 typedef PCDPtr PCDDataBase;
 PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string imageType, std::string coordinateSystem)
 {
@@ -235,6 +235,9 @@ PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string image
 	return pcd;
 }
 
+
+#ifdef debugPCD
+
 void PCDColorize(PCDPtr pcd, int R, int G, int B)
 {
 	PCDPtr outPCD(new PCD());
@@ -251,33 +254,29 @@ void PCDColorize(PCDPtr pcd, int R, int G, int B)
 	pcd = outPCD;
 }
 
-#ifdef debugPCD
+bool update = false;
+boost::mutex updateModelMutex;
+PCDPtr cloud(new PCD);
+pcl::visualization::PointCloudColorHandlerGenericField<PCDPoint> colorHandler(cloud, "intensity");
 
-int user_data = 0;
-
-void viewerOneOff(pcl::visualization::PCLVisualizer& viewer)
+void visualize()
 {
-	viewer.setBackgroundColor(1.0, 0.5, 1.0);
-	pcl::PointXYZ o;
-	o.x = 1.0;
-	o.y = 0;
-	o.z = 0;
-	viewer.addSphere(o, 0.25, "sphere", 0);
-	std::cout << "i only run once" << std::endl;
-}
+	static pcl::visualization::PCLVisualizer viewer("Simple Cloud Viewer");
+	viewer.addPointCloud(cloud, "sample cloud");
 
-void viewerPsycho(pcl::visualization::PCLVisualizer& viewer)
-{
-	static unsigned count = 0;
-	std::stringstream ss;
-	ss << "Once per viewer loop: " << count++;
-	viewer.removeShape("text", 0);
-	viewer.addText(ss.str(), 200, 300, "text", 0);
-
-	//FIXME: possible race condition here:
-	while ((user_data+1) % 2) {}
-
-	user_data++;
+	while (!viewer.wasStopped())
+	{
+		viewer.spinOnce(100);
+		// Get lock on the boolean update and check if cloud was updated
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		if (update)
+		{
+			if (!viewer.updatePointCloud(cloud, "sample cloud"))
+				viewer.addPointCloud(cloud, "sample cloud");
+			update = false;
+		}
+		updateLock.unlock();
+	}
 }
 #endif
 void imgPath(std::string* workpath, std::string* depth_name, std::string* amplitude_name)
@@ -314,7 +313,9 @@ int main()
 
 	int loader_iter = ITERATOR_MIN;
 	PCDPtr pcdThis,pcdBefore;
-
+#ifdef debugPCD
+	boost::thread workerThread(visualize);
+#endif
 	while (loader_iter < ITERATOR_MAX)
 	{
 		string image_name;
@@ -361,12 +362,8 @@ int main()
 		//??
 
 		//PCD KESZITES
-			/*
-				<item key="distorsion" type="Distortion" encoding="text">-0.40322 0.706050 0.001742 -0.002878 -1.370257</item>
-				<item key="intrinsic" type="Intrinsic" encoding="text">418.920523 418.285805 137.401996 122.136574 320 240</item>
-			*/
-		Intrinsic intrinsic(418.920523, 418.285805, 137.401996, 122.136574, 320, 240);
-		Distortion distortion(-0.40322, 0.706050, 0.001742, -0.002878, -1.370257);
+		Intrinsic intrinsic(418.920523, 418.285805, 137.401996, 122.136574, 320, 240);// <item key="intrinsic" type="Intrinsic" encoding="text">418.920523 418.285805 137.401996 122.136574 320 240</item>
+		Distortion distortion(-0.40322, 0.706050, 0.001742, -0.002878, -1.370257);// <item key = "distorsion" type = "Distortion" encoding = "text">-0.40322 0.706050 0.001742 - 0.002878 - 1.370257< / item>
 		std::string imgType = "DImage";
 		std::string coordinateSys = "OpenGL";
 		pcdThis = DepthToPCD(gaussian_res, intrinsic, distortion, imgType, coordinateSys);
@@ -375,30 +372,15 @@ int main()
 			cout << "PCD is nullpointer" << endl;
 			return -1;
 		}
-		PCDColorize(pcdThis, 255, 255, 255);
-
 
 		//PCD MEGJELENITES
 #ifdef debugPCD
-		pcl::visualization::CloudViewer viewer("Simple Cloud Viewer");
-		viewer.showCloud(pcdThis);
-
-		/*
-		while (!viewer.wasStopped())
-		{
-		}
-		 */
-		viewer.runOnVisualizationThreadOnce(viewerOneOff);
-		viewer.runOnVisualizationThread(viewerPsycho);
-		while (!viewer.wasStopped())
-		{
-			//you can also do cool processing here
-			//FIXME: Note that this is running in a separate thread from viewerPsycho
-			//and you should guard against race conditions yourself...
-			while ((user_data) % 2) {}
-			user_data++;
-		}
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		//PCDColorize(pcdThis, 255, 255, 255);
+		cloud = pcdThis;
+		update = true;
 #endif
+
 		//KOZOS PCD
 		
 		//cv::resize(amplitude_image_, amplitude_image, cv::Size(1920, 1080), 0, 0, cv::INTER_LINEAR);
@@ -440,10 +422,15 @@ int main()
 		*/
 
 
+#ifdef debugPCD
+		updateLock.unlock();
+#endif
 #ifdef debug
 		//Visualization part
 #endif
+		cout << "Picture number: " << loader_iter-ITERATOR_MIN<< endl;
 		loader_iter++;
 	}
+	workerThread.join();
 	return 0;
 }
