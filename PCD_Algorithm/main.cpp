@@ -335,12 +335,20 @@ int main()
 		rgb_img = cv::imread(workpath_rgbimg); // Read img to unsigned
 		if (depth_image_u.empty()) // Check for invalid input
 		{
+#ifdef debug
 			cout << "Could not open or find the depth image" << std::endl;
+			cout << "Iteration: " << loader_iter << "path: " << workpath_dimg << std::endl;
+			cv::waitKey(0);
+#endif
 			return -1;
 		}
 		if(rgb_img.empty() & !amplitude_name.empty())
 		{
+#ifdef debug
 			cout << "Could not open or find the RGB image" << std::endl;
+			cout << "Iteration: " << loader_iter << "path: " << workpath_rgbimg << std::endl;
+			cv::waitKey(0);
+#endif
 			return -1;
 		}
 
@@ -370,6 +378,7 @@ int main()
 		if (pcdThis == NULL)
 		{
 			cout << "PCD is nullpointer" << endl;
+			cv::waitKey(0);
 			return -1;
 		}
 
@@ -431,6 +440,11 @@ int main()
 		cout << "Picture number: " << loader_iter-ITERATOR_MIN<< endl;
 		loader_iter++;
 	}
+#ifdef debugPCD
 	workerThread.join();
+#endif
+#ifdef debug
+	cv::waitKey(0);
+#endif
 	return 0;
 }
