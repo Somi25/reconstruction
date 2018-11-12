@@ -1,3 +1,4 @@
+#include "defs.h"
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
@@ -11,7 +12,7 @@
 #include <pcl/point_types.h>
 #include <pcl/ModelCoefficients.h> 
 #include <pcl/visualization/cloud_viewer.h>
-#include "defs.h"
+#include <pcl/registration/icp.h>
 #include "Intrinsic.hpp"
 #include "Distortion.hpp"
 #ifdef debugPCD
@@ -132,10 +133,13 @@ void type_debug(cv::Mat in)
 	cout << r << endl;
 }
 
-typedef pcl::PointXYZRGB PCDPoint;
+typedef pcl::PointXYZ PCDPoint;
 typedef pcl::PointCloud<PCDPoint> PCD;
 typedef PCD::Ptr PCDPtr;
-typedef PCDPtr PCDDataBase;
+typedef pcl::PointXYZRGB PCDcPoint;
+typedef pcl::PointCloud<PCDcPoint> PCDc;
+typedef PCDc::Ptr PCDcPtr;
+
 PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string imageType, std::string coordinateSystem)
 {
 	//Intrinsic intr = popFrameAs<IntrinsicData>("cameraMatrix")->data(); //fill to intrinsic
@@ -161,9 +165,6 @@ PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string image
 
 	PCDPtr pcd(new PCD(in.cols, in.rows));
 	PCD::PointType p;
-	p.r = 255;
-	p.g = 255;
-	p.b = 255;
 
 	double x, y, x0, y0;
 	Eigen::Vector3f normPos;
@@ -235,29 +236,29 @@ PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string image
 	return pcd;
 }
 
-
 #ifdef debugPCD
 
-void PCDColorize(PCDPtr pcd, int R, int G, int B)
+void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B)
 {
-	PCDPtr outPCD(new PCD());
-	outPCD->resize(pcd->size());
+	outPtr->resize(inPcd->size());
 
-	for (size_t i = 0; i < pcd->size(); ++i)
+	for (size_t i = 0; i < inPcd->size(); ++i)
 	{
-		PCD::PointType p = pcd->points[i];
-		p.r = 255;
-		p.g = 255;
-		p.b = 255;
-		outPCD->points[i] = p;
+		PCDc::PointType p;
+		p.x = inPcd->points[i].x;
+		p.y = inPcd->points[i].y;
+		p.z = inPcd->points[i].z;
+		p.r = R;
+		p.g = G;
+		p.b = B;
+		outPtr->points[i] = p;
 	}
-	pcd = outPCD;
 }
 
 bool update = false;
 boost::mutex updateModelMutex;
-PCDPtr cloud(new PCD);
-pcl::visualization::PointCloudColorHandlerGenericField<PCDPoint> colorHandler(cloud, "intensity");
+PCDcPtr cloud(new pcl::PointCloud<pcl::PointXYZRGB>());
+//pcl::visualization::PointCloudColorHandlerGenericField<PCDPoint> colorHandler(cloud, "intensity");
 
 void visualize()
 {
@@ -352,13 +353,25 @@ int main()
 			return -1;
 		}
 
+#ifdef debug
+		cout << "Images loaded" << std::endl;
+#endif
 		cv::cvtColor(depth_image_u, depth_image_1c, CV_BGR2GRAY);//depth_image was an RGB, with same RGBpixel values -> greyscale
+#ifdef debug
+		cout << "bgr2gray done" << std::endl;
+#endif
 		depth_image_1c.convertTo(depth_image, CV_32F);
+#ifdef debug
+		cout << "u2f done" << std::endl;
+#endif
 		
 		//SZURES
 		cv::Mat median_res, gaussian_res;
 		cv::medianBlur(depth_image, median_res, 3);
 		cv::GaussianBlur(median_res, gaussian_res, cv::Size(3, 3), 1.8);
+#ifdef debug
+		cout << "filtering done" << std::endl;
+#endif
 
 		//ELOZO PCD MENTES
 		if (loader_iter - ITERATOR_MIN > 1)
@@ -377,21 +390,57 @@ int main()
 		pcdThis = DepthToPCD(gaussian_res, intrinsic, distortion, imgType, coordinateSys);
 		if (pcdThis == NULL)
 		{
+#ifdef debug
 			cout << "PCD is nullpointer" << endl;
 			cv::waitKey(0);
+#endif
 			return -1;
 		}
+#ifdef debug
+		cout << "DepthToPCD done" << std::endl;
+#endif
 
 		//PCD MEGJELENITES
 #ifdef debugPCD
 		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		//PCDColorize(pcdThis, 255, 255, 255);
-		cloud = pcdThis;
+		PCDColorize(pcdThis, cloud, 255, 255, 255);
+#ifdef debug
+		cout << "Colorization done" << std::endl;
+#endif
 		update = true;
 #endif
 
 		//KOZOS PCD
-		
+		if (loader_iter - ITERATOR_MIN > 1)
+		{
+			pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+			// Set the input source and target
+			pcl::PointCloud<pcl::PointXYZ>::Ptr CloudRegisteredPtr(new pcl::PointCloud<pcl::PointXYZ>());
+			icp.setInputSource(pcdBefore);
+			icp.setInputTarget(pcdThis);
+#ifdef debug
+			cout << "ICP--Set input done" << std::endl;
+#endif
+			// Set the max correspondence distance to 5cm (e.g., correspondences with higher distances will be ignored)
+			icp.setMaxCorrespondenceDistance(0.05);
+			// Set the maximum number of iterations (criterion 1)
+			icp.setMaximumIterations(50);
+			// Set the transformation epsilon (criterion 2)
+			icp.setTransformationEpsilon(1e-8);
+			// Set the euclidean distance difference epsilon (criterion 3)
+			icp.setEuclideanFitnessEpsilon(1);
+			// Perform the alignment
+			icp.align(*CloudRegisteredPtr);
+#ifdef debug
+			cout << "ICP--done" << std::endl;
+#endif
+			// Obtain the transformation that aligned cloud_source to cloud_source_registered
+			Eigen::Matrix4f transformation = icp.getFinalTransformation();
+#ifdef debug
+			cout << "ICP--Transformation done" << std::endl;
+#endif
+		}
+
 		//cv::resize(amplitude_image_, amplitude_image, cv::Size(1920, 1080), 0, 0, cv::INTER_LINEAR);
 		//cv::Mat depth_image;
 		//cv::resize(dpt_image, depth_image, cv::Size(amplitude_image.cols, amplitude_image.rows), 0, 0, cv::INTER_LINEAR);
