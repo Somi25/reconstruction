@@ -142,17 +142,10 @@ typedef PCDc::Ptr PCDcPtr;
 
 PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string imageType, std::string coordinateSystem)
 {
-	//Intrinsic intr = popFrameAs<IntrinsicData>("cameraMatrix")->data(); //fill to intrinsic
-	//Distortion dist = popFrameAs<DistortionData>("distCoeffs")->data(); //fill to distortion
-	//std::string imageType = in.type();
-	//std::string coordinateSystem = popFrameAs<StringData>("coordinateSystem")->data(); //fill coordinate sys
-
 	if (in.type() != CV_32FC1)
 	{
 		return (PCDPtr)NULL;
 	}// ("Only CV_32FC1 image is supported", "");
-
-	//bool outZImageConnected = isPinConnected("outZ");
 
 	double k1 = dist.radial(0);
 	double k2 = dist.radial(1);
@@ -229,15 +222,13 @@ PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string image
 			}
 		}
 	}
-	/*
-	pushFrameAs<PCDData>("outPCD", pcd);
-	if (outZImageConnected)
-		pushFrameAs<ImageData>("outZ", outZ);*/
+	
 	return pcd;
 }
 
-#ifdef debugPCD
 
+
+#ifdef debugPCD
 void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B)
 {
 	outPtr->resize(inPcd->size());
@@ -257,29 +248,52 @@ void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B)
 
 bool update = false;
 boost::mutex updateModelMutex;
-PCDcPtr cloud(new pcl::PointCloud<pcl::PointXYZRGB>());
+PCDcPtr cloudThis(new pcl::PointCloud<pcl::PointXYZRGB>());
+PCDcPtr cloudAlign(new pcl::PointCloud<pcl::PointXYZRGB>());
 //pcl::visualization::PointCloudColorHandlerGenericField<PCDPoint> colorHandler(cloud, "intensity");
 
-void visualize()
+void visualizeThis()
 {
-	static pcl::visualization::PCLVisualizer viewer("Simple Cloud Viewer");
-	viewer.addPointCloud(cloud, "sample cloud");
+	static pcl::visualization::PCLVisualizer viewerThis("Cloud Latest");
+	viewerThis.addPointCloud(cloudThis, "sample cloud");
 
-	while (!viewer.wasStopped())
+	while (!viewerThis.wasStopped())
 	{
-		viewer.spinOnce(100);
+		viewerThis.spinOnce(100);
 		// Get lock on the boolean update and check if cloud was updated
 		boost::mutex::scoped_lock updateLock(updateModelMutex);
 		if (update)
 		{
-			if (!viewer.updatePointCloud(cloud, "sample cloud"))
-				viewer.addPointCloud(cloud, "sample cloud");
+			if (!viewerThis.updatePointCloud(cloudThis, "sample cloud"))
+				viewerThis.addPointCloud(cloudThis, "sample cloud");
+			update = false;
+		}
+		updateLock.unlock();
+	}
+}
+void visualizeAlign()
+{
+	static pcl::visualization::PCLVisualizer viewerAligned("Cloud Aligned");
+	viewerAligned.addPointCloud(cloudAlign, "sample cloud");
+
+	while (!viewerAligned.wasStopped())
+	{
+		viewerAligned.spinOnce(100);
+		// Get lock on the boolean update and check if cloud was updated
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		if (update)
+		{
+			if (!viewerAligned.updatePointCloud(cloudAlign, "sample cloud"))
+				viewerAligned.addPointCloud(cloudAlign, "sample cloud");
 			update = false;
 		}
 		updateLock.unlock();
 	}
 }
 #endif
+
+
+
 void imgPath(std::string* workpath, std::string* depth_name, std::string* amplitude_name)
 {
 
@@ -313,10 +327,14 @@ int main()
 	imgPath(&workpath, &depth_name, &amplitude_name);
 
 	int loader_iter = ITERATOR_MIN;
-	PCDPtr pcdThis,pcdBefore;
+	PCDPtr pcdThis(new PCD());
+	PCDPtr pcdBefore(new PCD());
+
 #ifdef debugPCD
-	boost::thread workerThread(visualize);
+	boost::thread workerThreadThis(visualizeThis);
+	boost::thread workerThreadAlign(visualizeAlign);
 #endif
+
 	while (loader_iter < ITERATOR_MAX)
 	{
 		string image_name;
@@ -336,7 +354,7 @@ int main()
 		rgb_img = cv::imread(workpath_rgbimg); // Read img to unsigned
 		if (depth_image_u.empty()) // Check for invalid input
 		{
-#ifdef debug
+#ifdef showStatus
 			cout << "Could not open or find the depth image" << std::endl;
 			cout << "Iteration: " << loader_iter << "path: " << workpath_dimg << std::endl;
 			cv::waitKey(0);
@@ -345,7 +363,7 @@ int main()
 		}
 		if(rgb_img.empty() & !amplitude_name.empty())
 		{
-#ifdef debug
+#ifdef showStatus
 			cout << "Could not open or find the RGB image" << std::endl;
 			cout << "Iteration: " << loader_iter << "path: " << workpath_rgbimg << std::endl;
 			cv::waitKey(0);
@@ -353,15 +371,23 @@ int main()
 			return -1;
 		}
 
-#ifdef debug
+#ifdef showStatus
 		cout << "Images loaded" << std::endl;
 #endif
+
+
 		cv::cvtColor(depth_image_u, depth_image_1c, CV_BGR2GRAY);//depth_image was an RGB, with same RGBpixel values -> greyscale
-#ifdef debug
+
+
+#ifdef showStatus
 		cout << "bgr2gray done" << std::endl;
 #endif
+
+
 		depth_image_1c.convertTo(depth_image, CV_32F);
-#ifdef debug
+
+
+#ifdef showStatus
 		cout << "u2f done" << std::endl;
 #endif
 		
@@ -369,7 +395,9 @@ int main()
 		cv::Mat median_res, gaussian_res;
 		cv::medianBlur(depth_image, median_res, 3);
 		cv::GaussianBlur(median_res, gaussian_res, cv::Size(3, 3), 1.8);
-#ifdef debug
+
+
+#ifdef showStatus
 		cout << "filtering done" << std::endl;
 #endif
 
@@ -378,7 +406,6 @@ int main()
 		{
 			pcdBefore = pcdThis; //"Before": all before, "this": from this depth img.
 		}
-
 		//ATLAGOLAS
 		//??
 
@@ -390,37 +417,41 @@ int main()
 		pcdThis = DepthToPCD(gaussian_res, intrinsic, distortion, imgType, coordinateSys);
 		if (pcdThis == NULL)
 		{
-#ifdef debug
-			cout << "PCD is nullpointer" << endl;
+#ifdef showStatus
+			cout << "PCD is nullpointer" << std::endl;
 			cv::waitKey(0);
 #endif
 			return -1;
 		}
-#ifdef debug
+
+
+#ifdef showStatus
 		cout << "DepthToPCD done" << std::endl;
 #endif
+
 
 		//PCD MEGJELENITES
 #ifdef debugPCD
 		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		PCDColorize(pcdThis, cloud, 255, 255, 255);
-#ifdef debug
-		cout << "Colorization done" << std::endl;
-#endif
 		update = true;
 #endif
 
 		//KOZOS PCD
 		if (loader_iter - ITERATOR_MIN > 1)
 		{
+
 			pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
 			// Set the input source and target
-			pcl::PointCloud<pcl::PointXYZ>::Ptr CloudRegisteredPtr(new pcl::PointCloud<pcl::PointXYZ>());
+			PCDPtr CloudRegisteredPtr (new(PCD));
 			icp.setInputSource(pcdBefore);
 			icp.setInputTarget(pcdThis);
-#ifdef debug
+
+
+#ifdef showStatus
 			cout << "ICP--Set input done" << std::endl;
 #endif
+
+
 			// Set the max correspondence distance to 5cm (e.g., correspondences with higher distances will be ignored)
 			icp.setMaxCorrespondenceDistance(0.05);
 			// Set the maximum number of iterations (criterion 1)
@@ -431,20 +462,27 @@ int main()
 			icp.setEuclideanFitnessEpsilon(1);
 			// Perform the alignment
 			icp.align(*CloudRegisteredPtr);
-#ifdef debug
+
+
+#ifdef showStatus
 			cout << "ICP--done" << std::endl;
 #endif
+
+
 			// Obtain the transformation that aligned cloud_source to cloud_source_registered
 			Eigen::Matrix4f transformation = icp.getFinalTransformation();
-#ifdef debug
+
+
+#ifdef showStatus
 			cout << "ICP--Transformation done" << std::endl;
 #endif
+#ifdef debugPCD
+			PCDColorize(CloudRegisteredPtr, cloudAlign, 255, 255, 255);
+#ifdef showStatus
+			cout << "Colorization done" << std::endl;
+#endif
+#endif
 		}
-
-		//cv::resize(amplitude_image_, amplitude_image, cv::Size(1920, 1080), 0, 0, cv::INTER_LINEAR);
-		//cv::Mat depth_image;
-		//cv::resize(dpt_image, depth_image, cv::Size(amplitude_image.cols, amplitude_image.rows), 0, 0, cv::INTER_LINEAR);
-		
 
 		//TODO list ---------------------
 		//Szures
@@ -481,19 +519,18 @@ int main()
 
 
 #ifdef debugPCD
+		PCDColorize(pcdThis, cloudThis, 255, 255, 255);
+#ifdef showStatus
+		cout << "Colorization done" << std::endl;
+#endif
 		updateLock.unlock();
 #endif
-#ifdef debug
-		//Visualization part
-#endif
-		cout << "Picture number: " << loader_iter-ITERATOR_MIN<< endl;
+		cout << "Picture number: " << loader_iter-ITERATOR_MIN<< std::endl;
 		loader_iter++;
 	}
 #ifdef debugPCD
-	workerThread.join();
-#endif
-#ifdef debug
-	cv::waitKey(0);
+	workerThreadThis.join();
+	workerThreadAlign.join();
 #endif
 	return 0;
 }
