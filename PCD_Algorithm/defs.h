@@ -1,7 +1,11 @@
 #pragma once
 
-#define debug
-//#define debugPCD
+//bug with building 
+typedef unsigned long long pop_t;
+#define BOOST_TYPEOF_EMULATION
+#define _CRT_SECURE_NO_WARNINGS
+//#define debug
+#define debugPCD
 
 //#define Tanszekiervin
 //#define Enexport
