@@ -4,7 +4,7 @@
 typedef unsigned long long pop_t;
 #define BOOST_TYPEOF_EMULATION
 #define _CRT_SECURE_NO_WARNINGS
-//#define debug
+#define showStatus
 #define debugPCD
 
 //#define Tanszekiervin
