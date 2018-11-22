@@ -14,9 +14,19 @@ PCDPtr DepthToPCD(cv::Mat in)
 	//<item key = "distortion" type = "Distortion">-0.331462551773313 -0.055347852432151 -0.000475008698636328 -0.00144602003297141 0.473202830799858< / item>
 	Distortion dist(-0.331462551773313, -0.055347852432151, -0.000475008698636328, -0.00144602003297141, 0.473202830799858);
 #endif
+	return DepthToPCD(in, intr, dist);
+}
+
+PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist)
+{
 	std::string imageType = "DImage";
 	std::string coordinateSystem = "OpenGL";
 
+	return DepthToPCD(in, intr, dist, imageType, coordinateSystem);
+}
+
+PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string imageType, std::string coordinateSystem)
+{
 	if (in.type() != CV_32FC1)
 	{
 		return (PCDPtr)NULL;
@@ -97,6 +107,5 @@ PCDPtr DepthToPCD(cv::Mat in)
 			}
 		}
 	}
-
 	return pcd;
 }
