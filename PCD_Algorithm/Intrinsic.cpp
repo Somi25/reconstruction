@@ -40,15 +40,15 @@
 		return tr;
 	}
 
-	Eigen::Projective3f Intrinsic::toGLMatrix(float near, float far) const
+	Eigen::Projective3f Intrinsic::toGLMatrix(float near_, float far_) const
 	{
 		Eigen::Projective3f tr(Eigen::Projective3f::Identity());
 		tr(0, 0) = 2 * fx / width;
 		tr(0, 2) = 1 - 2 * cx / width;
 		tr(1, 1) = 2 * fy / height;
 		tr(1, 2) = 2 * cy / height - 1;
-		tr(2, 2) = -(far + near) / (far - near);
-		tr(2, 3) = -2 * far * near / (far - near);
+		tr(2, 2) = -(far_ + near_) / (far_ - near_);
+		tr(2, 3) = -2 * far_ * near_ / (far_ - near_);
 		tr(3, 2) = -1;
 		tr(3, 3) = 0;
 		return tr;

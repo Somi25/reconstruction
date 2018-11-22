@@ -23,7 +23,7 @@ public:
 
 	Eigen::Affine3f toMatrix() const;
 
-	Eigen::Projective3f toGLMatrix(float near, float far) const;
+	Eigen::Projective3f toGLMatrix(float near_, float far_) const;
 
 	cv::Mat toCvMat() const;
 
