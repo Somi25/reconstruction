@@ -1,20 +1,6 @@
 #include "defs.h"
-#include <opencv2/core.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/core/hal/interface.h>
-#include <opencv2/core/types_c.h>
-#include <opencv2/core/types.hpp>
-#include <iostream>
-#include <opencv2/core/cvdef.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl/ModelCoefficients.h> 
-#include <pcl/visualization/cloud_viewer.h>
-#include <pcl/registration/icp.h>
-#include "Intrinsic.hpp"
-#include "Distortion.hpp"
+#include "DepthToPCD.hpp"
+
 #ifdef debugPCD
 //#include <pcl/visualization/pcl_visualizer.h>
 //#include <pcl/io/io.h>
@@ -22,6 +8,610 @@
 #endif
 
 using namespace std;
+
+void cout_messages(std::string message)
+{
+#ifdef showStatus
+	cout << message << endl;
+#endif
+}
+
+#ifdef debugPCD
+void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B);
+
+bool update = false;
+boost::mutex updateModelMutex;
+
+PCDcPtr cloudShowA(new PCDc);
+#if shownWindowsNum > 1
+PCDcPtr cloudShowB(new PCDc);
+#endif
+#if shownWindowsNum > 2
+PCDcPtr cloudShowC(new PCDc);
+#endif
+#if shownWindowsNum > 3
+PCDcPtr cloudShowD(new PCDc);
+#endif
+#if shownWindowsNum > 4
+PCDcPtr cloudShowE(new PCDc);
+#endif
+#if shownWindowsNum > 5
+PCDcPtr cloudShowF(new PCDc);
+#endif
+
+void visualizeA()
+{
+	static pcl::visualization::PCLVisualizer viewerA("Show A");
+	viewerA.addPointCloud(cloudShowA, "Cloud A");
+
+	while (!viewerA.wasStopped())
+	{
+		viewerA.spinOnce(100);
+		// Get lock on the boolean update and check if cloud was updated
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		if (update)
+		{
+			if (!viewerA.updatePointCloud(cloudShowA, "Cloud A"))
+				viewerA.addPointCloud(cloudShowA, "Cloud A");
+			update = false;
+		}
+		updateLock.unlock();
+	}
+}
+
+#if shownWindowsNum > 1
+void visualizeB()
+{
+	static pcl::visualization::PCLVisualizer viewerB("Show B");
+	viewerB.addPointCloud(cloudShowB, "Cloud B");
+
+	while (!viewerB.wasStopped())
+	{
+		viewerB.spinOnce(100);
+		// Get lock on the boolean update and check if cloud was updated
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		if (update)
+		{
+			if (!viewerB.updatePointCloud(cloudShowB, "Cloud B"))
+				viewerB.addPointCloud(cloudShowB, "Cloud B");
+			update = false;
+		}
+		updateLock.unlock();
+	}
+}
+
+#endif
+#if shownWindowsNum > 2
+void visualizeC()
+{
+	static pcl::visualization::PCLVisualizer viewerC("Show C");
+	viewerC.addPointCloud(cloudShowC, "Cloud C");
+
+	while (!viewerC.wasStopped())
+	{
+		viewerC.spinOnce(100);
+		// Get lock on the boolean update and check if cloud was updated
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		if (update)
+		{
+			if (!viewerC.updatePointCloud(cloudShowC, "Cloud C"))
+				viewerC.addPointCloud(cloudShowC, "Cloud C");
+			update = false;
+		}
+		updateLock.unlock();
+	}
+}
+
+#endif
+#if shownWindowsNum > 3
+void visualizeD()
+{
+	static pcl::visualization::PCLVisualizer viewerD("Show D");
+	viewerD.addPointCloud(cloudShowD, "Cloud D");
+
+	while (!viewerD.wasStopped())
+	{
+		viewerD.spinOnce(100);
+		// Get lock on the boolean update and check if cloud was updated
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		if (update)
+		{
+			if (!viewerD.updatePointCloud(cloudShowD, "Cloud D"))
+				viewerD.addPointCloud(cloudShowD, "Cloud D");
+			update = false;
+		}
+		updateLock.unlock();
+	}
+}
+
+#endif
+#if shownWindowsNum > 4
+void visualizeE()
+{
+	static pcl::visualization::PCLVisualizer viewerE("Show E");
+	viewerE.addPointCloud(cloudShowE, "Cloud E");
+
+	while (!viewerE.wasStopped())
+	{
+		viewerE.spinOnce(100);
+		// Get lock on the boolean update and check if cloud was updated
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		if (update)
+		{
+			if (!viewerE.updatePointCloud(cloudShowE, "Cloud E"))
+				viewerE.addPointCloud(cloudShowE, "Cloud E");
+			update = false;
+		}
+		updateLock.unlock();
+	}
+}
+
+#endif
+#if shownWindowsNum > 5
+void visualizeF()
+{
+	static pcl::visualization::PCLVisualizer viewerF("Show F");
+	viewerF.addPointCloud(cloudShowF, "Cloud F");
+
+	while (!viewerF.wasStopped())
+	{
+		viewerF.spinOnce(100);
+		// Get lock on the boolean update and check if cloud was updated
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		if (update)
+		{
+			if (!viewerF.updatePointCloud(cloudShowF, "Cloud F"))
+				viewerF.addPointCloud(cloudShowF, "Cloud F");
+			update = false;
+		}
+		updateLock.unlock();
+	}
+}
+#endif
+void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B)
+{
+	outPtr->resize(inPcd->size());
+
+	for (size_t i = 0; i < inPcd->size(); ++i)
+	{
+		PCDc::PointType p;
+		p.x = inPcd->points[i].x;
+		p.y = inPcd->points[i].y;
+		p.z = inPcd->points[i].z;
+		p.r = R;
+		p.g = G;
+		p.b = B;
+		outPtr->points[i] = p;
+	}
+}
+
+
+#endif
+
+void type_debug(cv::Mat in);
+void saturation(cv::Mat& in, float alpha);
+int hist_max(cv::Mat in);
+void hist_debug(cv::Mat in);
+
+void HoleFill(cv::Mat& image);
+
+void filterDepth(cv::Mat& depth_image)
+{
+	cv::Mat temp;
+	//HoleFill(depth_image);
+	//pcl::removeNaNFromPointCloud(*m.cloud, *m.cloud, indices);
+	cv::medianBlur(depth_image, temp, 3);
+	cv::GaussianBlur(temp, depth_image, cv::Size(3, 3), 1.8);
+	cout_messages("filtering done");
+}
+
+void preparingDepth(cv::Mat& depth_image)
+{
+	cv::Mat temp;
+
+	uchar chans = 1 + (depth_image.type() >> CV_CN_SHIFT);
+	if (chans>1)
+	{
+		//depth_image was an RGB, with same RGBpixel values -> greyscale
+		cv::cvtColor(depth_image, temp, CV_BGR2GRAY);	//rgb->gray
+		cout_messages("bgr2gray done");
+	}
+	uchar depth = depth_image.type() & CV_MAT_DEPTH_MASK;
+	switch (depth) {
+	case CV_8U:;
+	case CV_8S:  depth = 8; break;
+	case CV_16U:;
+	case CV_16S: depth = 16;  break;
+	case CV_32S: depth = 32; break;
+	case CV_32F: depth = 0; break;
+	case CV_64F: depth = 1; break;
+	default:    return; //throw error
+	}
+	if (depth)
+	{
+		temp = depth_image;
+		temp.convertTo(depth_image, CV_32FC1);			//unsigned16->float32
+		cout_messages("u2f done");
+	}
+}
+
+void imgPath(std::string* workpath, std::string* depth_name, std::string* amplitude_name)
+{
+
+#ifdef Tanszekiervin
+	*workpath = (string)getenv("OneDrive") + "/Visual studio/defkepek/Tanszekiervin/";
+	*depth_name = "013654251447_depth_";
+	*amplitude_name = "013654251447_rgb_";
+#endif
+
+#ifdef Ervinexport
+	*workpath = (string)getenv("OneDrive") + "/Visual studio/defkepek/Ervinexport/";
+	*depth_name = "depth_" + std::to_string(CAM_NUM) + "_";
+	*amplitude_name = "ampli_" + std::to_string(CAM_NUM) + "_";
+#endif
+
+#ifdef Enexport
+	*workpath = (string)getenv("OneDrive") + "/Visual studio/defkepek/Enexport/";
+	*depth_name = "013654251447_depth_";
+	*amplitude_name = "013654251447_rgb_";
+#endif
+
+#ifdef Zinemath
+	*workpath = (string)getenv("OneDrive") + "/Visual studio/defkepek/Somi/";
+	*depth_name = "image";
+#endif
+
+#ifdef TanszekMunkaasztal1
+	*workpath = (string)getenv("OneDrive") + "/Visual studio/defkepek/TanszekMunkaasztal1/";
+	*depth_name = "depth_";
+#endif
+}
+
+inline int loadImages(cv::Mat& depth, cv::Mat& rgb, std::string& path, std::string& depth_name, std::string& amplitude_name, int imgNumber)
+{
+	string image_name;
+#if (defined(Tanszekiervin) | defined(Ervinexport) | defined(Enexport) | defined(Zinemath))
+	if (imgNumber < 10) image_name = "000" + std::to_string(imgNumber) + ".png";
+	else if (imgNumber < 100) image_name = "00" + std::to_string(imgNumber) + ".png";
+	else if (imgNumber < 1000) image_name = "0" + std::to_string(imgNumber) + ".png";
+#endif
+#if defined(TanszekMunkaasztal1)
+	if (imgNumber < 10) image_name = "00" + std::to_string(imgNumber) + ".png";
+	else if (imgNumber < 100) image_name = "0" + std::to_string(imgNumber) + ".png";
+	else if (imgNumber < 1000) image_name = std::to_string(imgNumber) + ".png";
+#endif
+	else  image_name = std::to_string(imgNumber);
+	string camNumPath = "";
+#ifdef CAM_NUM
+	camNumPath = std::to_string(CAM_NUM) + "/";
+#endif
+	string workpath_dimg = path + "Depth/" + camNumPath + depth_name + image_name;
+	string workpath_rgbimg = path + "RGB/" + camNumPath + amplitude_name + image_name;
+	
+	depth = cv::imread(workpath_dimg, cv::IMREAD_ANYDEPTH); // Read img to unsigned
+	rgb = cv::imread(workpath_rgbimg); // Read img to unsigned
+	if (depth.empty()) // Check for invalid input
+	{
+		cout_messages("Could not open or find the depth image");
+		//cout << "Iteration: " << imgNumber << "path: " << workpath_dimg << std::endl;
+		return 0;
+	}
+	if (rgb.empty() & !amplitude_name.empty())
+	{
+		cout_messages("Could not open or find the RGB image");
+		//cout << "Iteration: " << imgNumber << "path: " << workpath_rgbimg << std::endl;
+		return 0;
+	}
+	cout_messages("Images loaded");
+	return 1;
+}
+
+// Define a new point representation for < x, y, z, curvature >
+class MyPointRepresentation : public pcl::PointRepresentation <PCDnPoint>
+{
+	using pcl::PointRepresentation<PCDnPoint>::nr_dimensions_;
+public:
+	MyPointRepresentation()
+	{
+		// Define the number of dimensions
+		nr_dimensions_ = 4;
+	}
+
+	// Override the copyToFloatArray method to define our feature vector
+	virtual void copyToFloatArray(const PCDnPoint &p, float * out) const
+	{
+		// < x, y, z, curvature >
+		out[0] = p.x;
+		out[1] = p.y;
+		out[2] = p.z;
+		out[3] = p.curvature;
+	}
+};
+void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eigen::Matrix4f &final_transform, bool downsample = false)
+{
+	//
+	// Downsample for consistency and speed
+	// \note enable this for large datasets
+	PCDPtr src(new PCD);
+	PCDPtr tgt(new PCD);
+	pcl::VoxelGrid<pcl::PointXYZ> grid;
+	if (downsample)
+	{
+		grid.setLeafSize(0.05, 0.05, 0.05);
+		grid.setInputCloud(cloud_src);
+		grid.filter(*src);
+
+		grid.setInputCloud(cloud_tgt);
+		grid.filter(*tgt);
+	}
+	else
+	{
+		src = cloud_src;
+		tgt = cloud_tgt;
+	}
+
+
+	// Compute surface normals and curvature
+	PCDnPtr points_with_normals_src(new PCDn);
+	PCDnPtr points_with_normals_tgt(new PCDn);
+
+	pcl::NormalEstimation<PCDPoint, PCDnPoint> norm_est;
+	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
+	norm_est.setSearchMethod(tree);
+	norm_est.setKSearch(30);
+
+	norm_est.setInputCloud(src);
+	norm_est.compute(*points_with_normals_src);
+	pcl::copyPointCloud(*src, *points_with_normals_src);
+
+	norm_est.setInputCloud(tgt);
+	norm_est.compute(*points_with_normals_tgt);
+	pcl::copyPointCloud(*tgt, *points_with_normals_tgt);
+
+	//
+	// Instantiate our custom point representation (defined above) ...
+	MyPointRepresentation point_representation;
+	// ... and weight the 'curvature' dimension so that it is balanced against x, y, and z
+	float alpha[4] = { 1.0, 1.0, 1.0, 1.0 };
+	point_representation.setRescaleValues(alpha);
+
+	//
+	// Align
+	pcl::IterativeClosestPointNonLinear<PCDnPoint, PCDnPoint> reg;
+	reg.setTransformationEpsilon(1e-6);
+	// Set the maximum distance between two correspondences (src<->tgt) to 10cm
+	// Note: adjust this based on the size of your datasets
+	reg.setMaxCorrespondenceDistance(0.1);
+	// Set the point representation
+	reg.setPointRepresentation(boost::make_shared<const MyPointRepresentation>(point_representation));
+
+	reg.setInputSource(points_with_normals_src);
+	reg.setInputTarget(points_with_normals_tgt);
+
+
+
+	//
+	// Run the same optimization in a loop and visualize the results
+	Eigen::Matrix4f Ti = Eigen::Matrix4f::Identity(), prev, targetToSource;
+	PCDnPtr reg_result = points_with_normals_src;
+	reg.setMaximumIterations(3);//2
+	for (int i = 0; i < 3; ++i)//30
+	{
+		PCL_INFO("Iteration Nr. %d.\n", i);
+
+		// save cloud for visualization purpose
+		points_with_normals_src = reg_result;
+
+		// Estimate
+		reg.setInputSource(points_with_normals_src);
+		reg.align(*reg_result);
+
+		//accumulate transformation between each Iteration
+		Ti = reg.getFinalTransformation() * Ti;
+
+		//if the difference between this transformation and the previous one
+		//is smaller than the threshold, refine the process by reducing
+		//the maximal correspondence distance
+		if (fabs((reg.getLastIncrementalTransformation() - prev).sum()) < reg.getTransformationEpsilon())
+			reg.setMaxCorrespondenceDistance(reg.getMaxCorrespondenceDistance() - 0.001);
+
+		prev = reg.getLastIncrementalTransformation();
+
+		// visualize current state
+		//showCloudsRight(points_with_normals_tgt, points_with_normals_src);
+	}
+
+	//
+  // Get the transformation from target to source
+	targetToSource = Ti.inverse();
+
+	//
+	// Transform target back in source frame
+	pcl::transformPointCloud(*cloud_tgt, *output, targetToSource);
+	/*
+	p->removePointCloud("source");
+	p->removePointCloud("target");
+
+	PointCloudColorHandlerCustom<PointT> cloud_tgt_h(output, 0, 255, 0);
+	PointCloudColorHandlerCustom<PointT> cloud_src_h(cloud_src, 255, 0, 0);
+	p->addPointCloud(output, cloud_tgt_h, "target", vp_2);
+	p->addPointCloud(cloud_src, cloud_src_h, "source", vp_2);
+
+	PCL_INFO("Press q to continue the registration.\n");
+	p->spin();
+
+	p->removePointCloud("source");
+	p->removePointCloud("target");
+	*/
+	//add the source to the transformed target
+	*output += *cloud_src;
+
+	final_transform = targetToSource;
+}
+
+
+
+
+
+
+
+
+int main()
+{
+	std::string workpath, depth_name, amplitude_name;
+	imgPath(&workpath, &depth_name, &amplitude_name);
+
+	int loader_iter = ITERATOR_MIN;
+	PCDPtr pcdThis(new PCD());
+	PCDPtr pcdBefore(new PCD());
+
+	//start visualizer windows
+#ifdef debugPCD
+	boost::thread workerThreadA(visualizeA);
+#if shownWindowsNum > 1
+	boost::thread workerThreadB(visualizeB);
+#endif
+#if shownWindowsNum > 2
+	boost::thread workerThreadC(visualizeC);
+#endif
+#if shownWindowsNum > 3
+	boost::thread workerThreadD(visualizeD);
+#endif
+#if shownWindowsNum > 4
+	boost::thread workerThreadE(visualizeE);
+#endif
+#if shownWindowsNum > 5
+	boost::thread workerThreadF(visualizeF);
+#endif
+#endif
+
+	while (loader_iter < ITERATOR_MAX)
+	{
+		cv::Mat depth_image, rgb_img;
+		//Load
+		if (!loadImages(depth_image, rgb_img, workpath, depth_name, amplitude_name, loader_iter))
+		{
+			return -1;
+		}
+
+		//Conversion
+		preparingDepth(depth_image);
+
+		//Filtering
+		filterDepth(depth_image);
+
+		//Bring up the last PCD
+		if (loader_iter - ITERATOR_MIN > 0)
+		{
+			pcdBefore = pcdThis; //"Before": all before, "this": from this depth img.
+		}
+
+		//Making new PCD
+		cv::Mat temp;
+		depth_image.copyTo(temp);
+		//saturation(temp, (float)1 / (float)hist_max(temp));
+		pcdThis = DepthToPCD(depth_image);
+		if (pcdThis == NULL)
+		{
+			cout_messages("PCD is nullpointer");
+			return -1;
+		}
+		cout_messages("DepthToPCD done");
+
+
+		//Show PCD
+#ifdef debugPCD
+		boost::mutex::scoped_lock updateLock(updateModelMutex);
+		update = true;
+#endif
+#ifdef debugPCD
+		PCDColorize(pcdThis, cloudShowA, 255, 255, 255);
+#endif
+
+		//Align PCD
+#ifdef Align
+		if ((loader_iter - ITERATOR_MIN) > 0)
+		{
+			//Register PCD
+			PCDPtr temp(new PCD), result(new PCD);
+			Eigen::Matrix4f GlobalTransform = Eigen::Matrix4f::Identity(), pairTransform;
+			alignPCD(pcdBefore, pcdThis, temp, pairTransform,true);
+			//transform current pair into the global transform
+			pcl::transformPointCloud(*temp, *result, GlobalTransform);
+#ifdef debugPCD
+			//PCDColorize(result, cloudShowB, 255, 255, 255);
+#endif
+			//update the global transform
+			GlobalTransform = GlobalTransform * pairTransform;
+
+			//-------------kibaszott meres ------------------------//
+			/*
+			double freq = cvGetTickFrequency();
+			int64 e1;
+			int64 e2;
+			double time;
+			e1 = cvGetTickCount();
+
+
+
+			//Insert algorithm here!
+
+
+
+
+			e2 = cvGetTickCount();
+			time = (e2 - e1) / freq;
+			cout << time << " sec volt a futasi ido" << endl;
+			*/
+
+
+		}
+#endif
+#ifdef debugPCD
+		updateLock.unlock();
+#endif
+		std::cout << "Picture number: " << loader_iter-ITERATOR_MIN<< std::endl;
+		loader_iter++;
+	}
+	//join threads
+#ifdef debugPCD
+	workerThreadA.join();
+#if shownWindowsNum > 1
+	workerThreadB.join();
+#endif
+#if shownWindowsNum > 2
+	workerThreadC.join();
+#endif
+#if shownWindowsNum > 3
+	workerThreadD.join();
+#endif
+#if shownWindowsNum > 4
+	workerThreadE.join();
+#endif
+#if shownWindowsNum > 5
+	workerThreadF.join();
+#endif
+#endif
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//Functions from former projects
 
 
 #define HIGH2LOW 0
@@ -62,7 +652,7 @@ void gethistvalley(cv::Mat imgIn, int* idxOut, double* valueOut, int type, int v
 			break;
 		case INIT:	if (value_before > hist.at<float>(i, 0)) status = SET;
 					else status = RISE;
-					break;
+			break;
 		case SET:	if (value_before < hist.at<float>(i, 0))
 		{
 			if (++valley_counter == valley_count)
@@ -84,7 +674,166 @@ void gethistvalley(cv::Mat imgIn, int* idxOut, double* valueOut, int type, int v
 	*valueOut = -1;
 }
 
+void HoleFill(cv::Mat& image)
+{
+	if (image.type() != CV_32FC1)
+	{
+		cout_messages("Only CV_32FC1 is supported");
+		return;
+	}
+	int kernelSize = 5; //3,5,7..
+	int iterations = 2;
+	double threshold = 1.0;
+
+	iterations = std::max(iterations, 0);
+
+	vector<cv::Point3i> missing;
+
+	for (int i = 0; i < iterations; ++i)
+	{
+		int XX = image.cols;
+		int YY = image.rows;
+		if (i == 0)
+		{
+			for (int y = 0; y < YY; y++)
+			{
+				for (int x = 0; x < XX; x++)
+				{
+					float tmp = image.at<float>(y, x);
+					if (tmp <= threshold || std::isnan(tmp) || std::isinf(tmp))
+					{
+						float res = 0.0f;
+						int found = 0;
+						//define kernel var
+						int kernel_var = (kernelSize - 1) / 2;
+						//calculate limits
+						int lim_dx_b = -kernel_var;
+						int lim_dx_t = kernel_var;
+						int lim_dy_b = -kernel_var;
+						int lim_dy_t = kernel_var;
+						for (int k = 0; k < kernel_var; k++)
+						{
+							if (x == k)
+								lim_dx_b = -k;
+							if (XX - 1 - x == k)
+								lim_dx_t = k;
+							if (y == k)
+								lim_dy_b = -k;
+							if (YY - 1 - y == k)
+								lim_dy_t = k;
+						}
+
+						for (int dx = lim_dx_b; dx <= lim_dx_t; dx++)
+						{
+							for (int dy = lim_dy_b; dy <= lim_dy_t; dy++)
+							{
+								if (x + dx >= 0 && y + dy >= 0 && x + dx < XX && y + dy < YY)
+								{
+									float val = image.at<float>(y + dy, x + dx);
+									if (val > threshold && !std::isnan(val) && !std::isinf(val))
+									{
+										res += val;
+										found++;
+									}
+								}
+							}
+						}
+						int area = (lim_dx_t - lim_dx_b)*(lim_dy_t - lim_dy_b);
+						if (found >= (area - 1) / 2)
+							image.at<float>(y, x) = res / found;
+						else
+							missing.push_back(cv::Point3i(x, y, 1));
+					}
+				}
+			}
+		}
+		else
+		{
+			for (int counter = 0; counter < missing.size(); counter++)
+			{
+				if (missing[counter].z) //0 if found
+				{
+					int x = missing[counter].x, y = missing[counter].y;
+					float tmp = image.at<float>(y, x);
+					if (tmp <= threshold || std::isnan(tmp) || std::isinf(tmp))
+					{
+						float res = 0.0f;
+						int found = 0;
+						//define kernel var
+						int kernel_var = (kernelSize - 1) / 2;
+						//calculate limits
+						int lim_dx_b = -kernel_var;
+						int lim_dx_t = kernel_var;
+						int lim_dy_b = -kernel_var;
+						int lim_dy_t = kernel_var;
+						for (int k = 0; k < kernel_var; k++)
+						{
+							if (x == k)
+								lim_dx_b = -k;
+							if (XX - 1 - x == k)
+								lim_dx_t = k;
+							if (y == k)
+								lim_dy_b = -k;
+							if (YY - 1 - y == k)
+								lim_dy_t = k;
+						}
+
+						for (int dx = lim_dx_b; dx <= lim_dx_t; dx++)
+						{
+							for (int dy = lim_dy_b; dy <= lim_dy_t; dy++)
+							{
+								if (x + dx >= 0 && y + dy >= 0 && x + dx < XX && y + dy < YY)
+								{
+									float val = image.at<float>(y + dy, x + dx);
+									if (val > threshold && !std::isnan(val) && !std::isinf(val))
+									{
+										res += val;
+										found++;
+									}
+								}
+							}
+						}
+						int area = (lim_dx_t - lim_dx_b)*(lim_dy_t - lim_dy_b);
+						if (found >= (area - 1) / 2)
+						{
+							image.at<float>(y, x) = res / found;
+							missing[counter].z = 0;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 void hist_debug(cv::Mat in)
+{
+	int imgCount = 1;
+	const int chs = in.channels();
+	std::vector<cv::Mat> channels;
+	for (int i = 0; i < chs; i++)
+	{
+		channels.push_back(cv::Mat());
+	}
+	cv::split(in, channels);
+	for (int i = 0; i < chs; i++)
+	{
+		cv::Mat inHist = channels[i];
+		cv::Mat hist;
+		int histSize = 2048;
+		float range[] = { 0, 2047 };
+		const float* histRange = { range };
+
+		cv::calcHist(&inHist, imgCount, 0, cv::Mat(), hist, 1, &histSize, &histRange);
+		for (int k = 0; k < histSize; k++)
+		{
+			cout << (int)(hist.at<float>(k, 0)) << "db, " << k << " val, " << i << " channel" << endl;
+		}
+	}
+
+}
+
+int hist_max(cv::Mat in)
 {
 	int imgCount = 1;
 	const int chs = in.channels();
@@ -103,12 +852,13 @@ void hist_debug(cv::Mat in)
 		const float* histRange = { range };
 
 		cv::calcHist(&inHist, imgCount, 0, cv::Mat(), hist, 1, &histSize, &histRange);
-		for (int k = 0; k < histSize; k++)
+		for (int k = histSize-1; k > -1; k--)
 		{
-			cout << (int)(hist.at<float>(k, 0)) << "db, " << k << " val, " << i << " channel" << endl;
+			if ((int)(hist.at<float>(k, 0)) != 0)
+				return k;
 		}
 	}
-
+	return -1;
 }
 
 void type_debug(cv::Mat in)
@@ -133,404 +883,18 @@ void type_debug(cv::Mat in)
 	cout << r << endl;
 }
 
-typedef pcl::PointXYZ PCDPoint;
-typedef pcl::PointCloud<PCDPoint> PCD;
-typedef PCD::Ptr PCDPtr;
-typedef pcl::PointXYZRGB PCDcPoint;
-typedef pcl::PointCloud<PCDcPoint> PCDc;
-typedef PCDc::Ptr PCDcPtr;
-
-PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string imageType, std::string coordinateSystem)
+void saturation(cv::Mat& in,float alpha)
 {
 	if (in.type() != CV_32FC1)
 	{
-		return (PCDPtr)NULL;
-	}// ("Only CV_32FC1 image is supported", "");
-
-	double k1 = dist.radial(0);
-	double k2 = dist.radial(1);
-	double p1 = dist.tangential(0);
-	double p2 = dist.tangential(1);
-	double k3 = dist.radial(2);
-
-	cv::Mat outZ;
-	outZ = cv::Mat(in.rows, in.cols, CV_32FC1, cv::Scalar(0));
-
-	PCDPtr pcd(new PCD(in.cols, in.rows));
-	PCD::PointType p;
-
-	double x, y, x0, y0;
-	Eigen::Vector3f normPos;
-	Eigen::Vector3f imagePos;
-	for (int j = 0; j < in.rows; ++j)
+		cout_messages("Only CV_32FC1 is supported");
+		return;
+	}
+	for (int y = 0; y < in.rows; y++)
 	{
-		for (int i = 0; i < in.cols; ++i)
+		for (int x = 0; x < in.cols; x++)
 		{
-			/// Normalize coordinates
-			normPos = intr.backProject(i, j, 1);
-			x0 = x = normPos.x();
-			y0 = y = normPos.y();
-
-			/// Copy from OpenCV undistortPoints
-			const int maxIter = 5;
-			for (int iter = 0; iter < maxIter; ++iter)
-			{
-				double r2 = x * x + y * y;
-				double _2xy = 2 * x * y;
-				double icdist = 1 / (1 + (k1 + (k2 + k3 * r2) * r2) * r2); /// Radial
-				double deltaX = p1 * _2xy + p2 * (r2 + 2 * x*x);     /// X tangential
-				double deltaY = p1 * (r2 + 2 * y*y) + p2 * _2xy;             /// Y tangential
-				x = (x0 - deltaX) * icdist;
-				y = (y0 - deltaY) * icdist;
-
-				if (r2 >= 1)
-					break;
-			}
-
-			float z = in.at<float>(j, i);
-
-			if (z <= 0.01)
-			{
-				continue;
-			}
-
-			if (imageType == "DImage")
-			{
-				/// Distance to z
-				z /= sqrt(x*x + y * y + 1);
-			}
-
-			/// Z to pcd
-			p.x = x * z;
-			p.y = y * z;
-			p.z = z;
-
-			if (coordinateSystem == "OpenGL")
-			{
-				p.y = -p.y;
-				p.z = -p.z;
-			}
-
-			pcd->at(i, j) = p;
-
-			//if (outZImageConnected)
-			{
-				imagePos = intr.project(Eigen::Vector3f(x, y, 1));
-
-				if (imagePos.x() >= 0 && imagePos.x() < in.cols && imagePos.y() >= 0 && imagePos.y() < in.rows)
-					outZ.at<float>(imagePos.y(), imagePos.x()) = z;
-			}
+			in.at<float>(y, x) *= alpha;
 		}
 	}
-	
-	return pcd;
-}
-
-
-
-#ifdef debugPCD
-void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B)
-{
-	outPtr->resize(inPcd->size());
-
-	for (size_t i = 0; i < inPcd->size(); ++i)
-	{
-		PCDc::PointType p;
-		p.x = inPcd->points[i].x;
-		p.y = inPcd->points[i].y;
-		p.z = inPcd->points[i].z;
-		p.r = R;
-		p.g = G;
-		p.b = B;
-		outPtr->points[i] = p;
-	}
-}
-
-bool update = false;
-boost::mutex updateModelMutex;
-PCDcPtr cloudThis(new pcl::PointCloud<pcl::PointXYZRGB>());
-PCDcPtr cloudAlign(new pcl::PointCloud<pcl::PointXYZRGB>());
-//pcl::visualization::PointCloudColorHandlerGenericField<PCDPoint> colorHandler(cloud, "intensity");
-
-void visualizeThis()
-{
-	static pcl::visualization::PCLVisualizer viewerThis("Cloud Latest");
-	viewerThis.addPointCloud(cloudThis, "sample cloud");
-
-	while (!viewerThis.wasStopped())
-	{
-		viewerThis.spinOnce(100);
-		// Get lock on the boolean update and check if cloud was updated
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		if (update)
-		{
-			if (!viewerThis.updatePointCloud(cloudThis, "sample cloud"))
-				viewerThis.addPointCloud(cloudThis, "sample cloud");
-			update = false;
-		}
-		updateLock.unlock();
-	}
-}
-void visualizeAlign()
-{
-	static pcl::visualization::PCLVisualizer viewerAligned("Cloud Aligned");
-	viewerAligned.addPointCloud(cloudAlign, "sample cloud");
-
-	while (!viewerAligned.wasStopped())
-	{
-		viewerAligned.spinOnce(100);
-		// Get lock on the boolean update and check if cloud was updated
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		if (update)
-		{
-			if (!viewerAligned.updatePointCloud(cloudAlign, "sample cloud"))
-				viewerAligned.addPointCloud(cloudAlign, "sample cloud");
-			update = false;
-		}
-		updateLock.unlock();
-	}
-}
-#endif
-
-
-
-void imgPath(std::string* workpath, std::string* depth_name, std::string* amplitude_name)
-{
-
-#ifdef Tanszekiervin
-	*workpath = "D:/OneDrive/Visual studio/defkepek/Tanszekiervin/";
-	*depth_name = "013654251447_depth_";
-	*amplitude_name = "013654251447_rgb_";
-#endif
-
-#ifdef Ervinexport
-	*workpath = "D:/OneDrive/Visual studio/defkepek/Ervinexport/";
-	*depth_name = "depth_" + std::to_string(CAM_NUM) + "_";
-	*amplitude_name = "ampli_" + std::to_string(CAM_NUM) + "_";
-#endif
-
-#ifdef Enexport
-	*workpath = "D:/OneDrive/Visual studio/defkepek/Enexport/";
-	*depth_name = "013654251447_depth_";
-	*amplitude_name = "013654251447_rgb_";
-#endif
-
-#ifdef Zinemath
-	*workpath = "D:/OneDrive/Visual studio/defkepek/Somi/";
-	*depth_name = "image";
-#endif
-}
-
-int main()
-{
-	std::string workpath, depth_name, amplitude_name;
-	imgPath(&workpath, &depth_name, &amplitude_name);
-
-	int loader_iter = ITERATOR_MIN;
-	PCDPtr pcdThis(new PCD());
-	PCDPtr pcdBefore(new PCD());
-
-#ifdef debugPCD
-	boost::thread workerThreadThis(visualizeThis);
-	boost::thread workerThreadAlign(visualizeAlign);
-#endif
-
-	while (loader_iter < ITERATOR_MAX)
-	{
-		string image_name;
-		if (loader_iter < 10) image_name = "000" + std::to_string(loader_iter) + ".png";
-		else if (loader_iter<100) image_name = "00" + std::to_string(loader_iter) + ".png";
-		else if (loader_iter<1000) image_name = "0" + std::to_string(loader_iter) + ".png";
-		else  image_name = std::to_string(loader_iter);
-		string camNumPath = "";
-#ifdef CAM_NUM
-		camNumPath = std::to_string(CAM_NUM) + "/";
-#endif
-		string workpath_dimg = workpath + "Depth/" + camNumPath + depth_name + image_name;
-		string workpath_rgbimg = workpath + "RGB/" + camNumPath + amplitude_name + image_name;
-
-		cv::Mat depth_image_u, depth_image, depth_image_1c, rgb_img; //depth_image_, rgb_img
-		depth_image_u = cv::imread(workpath_dimg); // Read img to unsigned
-		rgb_img = cv::imread(workpath_rgbimg); // Read img to unsigned
-		if (depth_image_u.empty()) // Check for invalid input
-		{
-#ifdef showStatus
-			cout << "Could not open or find the depth image" << std::endl;
-			cout << "Iteration: " << loader_iter << "path: " << workpath_dimg << std::endl;
-			cv::waitKey(0);
-#endif
-			return -1;
-		}
-		if(rgb_img.empty() & !amplitude_name.empty())
-		{
-#ifdef showStatus
-			cout << "Could not open or find the RGB image" << std::endl;
-			cout << "Iteration: " << loader_iter << "path: " << workpath_rgbimg << std::endl;
-			cv::waitKey(0);
-#endif
-			return -1;
-		}
-
-#ifdef showStatus
-		cout << "Images loaded" << std::endl;
-#endif
-
-
-		cv::cvtColor(depth_image_u, depth_image_1c, CV_BGR2GRAY);//depth_image was an RGB, with same RGBpixel values -> greyscale
-
-
-#ifdef showStatus
-		cout << "bgr2gray done" << std::endl;
-#endif
-
-
-		depth_image_1c.convertTo(depth_image, CV_32F);
-
-
-#ifdef showStatus
-		cout << "u2f done" << std::endl;
-#endif
-		
-		//SZURES
-		cv::Mat median_res, gaussian_res;
-		cv::medianBlur(depth_image, median_res, 3);
-		cv::GaussianBlur(median_res, gaussian_res, cv::Size(3, 3), 1.8);
-
-
-#ifdef showStatus
-		cout << "filtering done" << std::endl;
-#endif
-
-		//ELOZO PCD MENTES
-		if (loader_iter - ITERATOR_MIN > 1)
-		{
-			pcdBefore = pcdThis; //"Before": all before, "this": from this depth img.
-		}
-		//ATLAGOLAS
-		//??
-
-		//PCD KESZITES
-		Intrinsic intrinsic(418.920523, 418.285805, 137.401996, 122.136574, 320, 240);// <item key="intrinsic" type="Intrinsic" encoding="text">418.920523 418.285805 137.401996 122.136574 320 240</item>
-		Distortion distortion(-0.40322, 0.706050, 0.001742, -0.002878, -1.370257);// <item key = "distorsion" type = "Distortion" encoding = "text">-0.40322 0.706050 0.001742 - 0.002878 - 1.370257< / item>
-		std::string imgType = "DImage";
-		std::string coordinateSys = "OpenGL";
-		pcdThis = DepthToPCD(gaussian_res, intrinsic, distortion, imgType, coordinateSys);
-		if (pcdThis == NULL)
-		{
-#ifdef showStatus
-			cout << "PCD is nullpointer" << std::endl;
-			cv::waitKey(0);
-#endif
-			return -1;
-		}
-
-
-#ifdef showStatus
-		cout << "DepthToPCD done" << std::endl;
-#endif
-
-
-		//PCD MEGJELENITES
-#ifdef debugPCD
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		update = true;
-#endif
-
-		//KOZOS PCD
-		if (loader_iter - ITERATOR_MIN > 1)
-		{
-
-			pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-			// Set the input source and target
-			PCDPtr CloudRegisteredPtr (new(PCD));
-			icp.setInputSource(pcdBefore);
-			icp.setInputTarget(pcdThis);
-
-
-#ifdef showStatus
-			cout << "ICP--Set input done" << std::endl;
-#endif
-
-
-			// Set the max correspondence distance to 5cm (e.g., correspondences with higher distances will be ignored)
-			icp.setMaxCorrespondenceDistance(0.05);
-			// Set the maximum number of iterations (criterion 1)
-			icp.setMaximumIterations(50);
-			// Set the transformation epsilon (criterion 2)
-			icp.setTransformationEpsilon(1e-8);
-			// Set the euclidean distance difference epsilon (criterion 3)
-			icp.setEuclideanFitnessEpsilon(1);
-			// Perform the alignment
-			icp.align(*CloudRegisteredPtr);
-
-
-#ifdef showStatus
-			cout << "ICP--done" << std::endl;
-#endif
-
-
-			// Obtain the transformation that aligned cloud_source to cloud_source_registered
-			Eigen::Matrix4f transformation = icp.getFinalTransformation();
-
-
-#ifdef showStatus
-			cout << "ICP--Transformation done" << std::endl;
-#endif
-#ifdef debugPCD
-			PCDColorize(CloudRegisteredPtr, cloudAlign, 255, 255, 255);
-#ifdef showStatus
-			cout << "Colorization done" << std::endl;
-#endif
-#endif
-		}
-
-		//TODO list ---------------------
-		//Szures
-			//melyseg gauss
-			//melyseg median??
-			//amplitudo hisztogram
-		//PCD
-			//pontfelho keszites
-		//KozosPCD
-			//Iterative closest point
-		//
-		
-
-
-		//-------------kibaszott meres ------------------------//
-		/*
-		double freq = cvGetTickFrequency();
-		int64 e1;
-		int64 e2;
-		double time;
-		e1 = cvGetTickCount();
-
-
-
-		//Insert algorithm here!
-
-
-
-
-		e2 = cvGetTickCount();
-		time = (e2 - e1) / freq;
-		cout << time << " sec volt a futasi ido" << endl;
-		*/
-
-
-#ifdef debugPCD
-		PCDColorize(pcdThis, cloudThis, 255, 255, 255);
-#ifdef showStatus
-		cout << "Colorization done" << std::endl;
-#endif
-		updateLock.unlock();
-#endif
-		cout << "Picture number: " << loader_iter-ITERATOR_MIN<< std::endl;
-		loader_iter++;
-	}
-#ifdef debugPCD
-	workerThreadThis.join();
-	workerThreadAlign.join();
-#endif
-	return 0;
 }

@@ -24,6 +24,9 @@
     <ClCompile Include="Distortion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DepthToPCD.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Intrinsic.hpp">
@@ -33,6 +36,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Distortion.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DepthToPCD.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="External.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
