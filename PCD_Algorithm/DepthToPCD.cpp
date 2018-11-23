@@ -98,13 +98,45 @@ PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string image
 
 			pcd->at(i, j) = p;
 
-			//if (outZImageConnected)
-			{
-				imagePos = intr.project(Eigen::Vector3f(x, y, 1));
+			imagePos = intr.project(Eigen::Vector3f(x, y, 1));
 
-				if (imagePos.x() >= 0 && imagePos.x() < in.cols && imagePos.y() >= 0 && imagePos.y() < in.rows)
-					outZ.at<float>(imagePos.y(), imagePos.x()) = z;
-			}
+			if (imagePos.x() >= 0 && imagePos.x() < in.cols && imagePos.y() >= 0 && imagePos.y() < in.rows)
+				outZ.at<float>(imagePos.y(), imagePos.x()) = z;
+		}
+	}
+	return pcd;
+}
+
+
+
+PCDPtr DepthToPCD(cv::Mat in, int depth_unit)
+{
+	return DepthToPCD(in, depth_unit, 53.8, 84.1);
+}
+
+PCDPtr DepthToPCD(cv::Mat in, int depth_unit, float vert_viewing_angle, float horiz_viewing_angle)
+{
+	float width, height;
+
+	PCDPtr pcd(new PCD(in.cols, in.rows));
+	PCD::PointType n,p;
+
+	float transform_w = std::tan(horiz_viewing_angle * M_PI / 180 / 2) * 2;
+	float transform_h = std::tan(vert_viewing_angle * M_PI / 180 / 2) * 2;
+	float depth;
+	for (int y = 0; y < in.rows; y++)
+	{
+		for (int x = 0; x < in.cols; x++)
+		{
+			depth = in.at<float>(y, x) / depth_unit;
+			n.x = x / in.cols - 0.5;
+			p.x = n.x * depth * transform_w;
+
+			n.y = 0.5 - y / in.rows;
+			p.y =  n.y * depth * transform_h;
+
+			p.z = depth;
+			pcd->at(x,y) = p;
 		}
 	}
 	return pcd;
