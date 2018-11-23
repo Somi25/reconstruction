@@ -168,21 +168,39 @@ void visualizeF()
 	}
 }
 #endif
-void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B)
+
+void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, bool autoColor, uint8_t R = 255, uint8_t G = 255, uint8_t B = 255)
 {
 	outPtr->resize(inPcd->size());
-
-	for (size_t i = 0; i < inPcd->size(); ++i)
+	if (autoColor)
 	{
-		PCDc::PointType p;
-		p.x = inPcd->points[i].x;
-		p.y = inPcd->points[i].y;
-		p.z = inPcd->points[i].z;
-		p.r = R;
-		p.g = G;
-		p.b = B;
-		outPtr->points[i] = p;
+		for (size_t i = 0; i < inPcd->size(); ++i)
+		{
+			PCDc::PointType p;
+			p.x = inPcd->points[i].x;
+			p.y = inPcd->points[i].y;
+			p.z = p.r = p.g = p.b = inPcd->points[i].z;
+			outPtr->points[i] = p;
+		}
 	}
+	else
+	{
+		for (size_t i = 0; i < inPcd->size(); ++i)
+		{
+			PCDc::PointType p;
+			p.x = inPcd->points[i].x;
+			p.y = inPcd->points[i].y;
+			p.z = inPcd->points[i].z;
+			p.r = R;
+			p.g = G;
+			p.b = B;
+			outPtr->points[i] = p;
+		}
+	}
+}
+void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B)
+{
+	PCDColorize(inPcd, outPtr, false, R, G, B);
 }
 
 
@@ -510,7 +528,7 @@ int main()
 		cv::Mat temp;
 		depth_image.copyTo(temp);
 		//saturation(temp, (float)1 / (float)hist_max(temp));
-		pcdThis = DepthToPCD(depth_image);
+		pcdThis = DepthToPCD(depth_image,10.0);
 		if (pcdThis == NULL)
 		{
 			cout_messages("PCD is nullpointer");
@@ -525,7 +543,7 @@ int main()
 		update = true;
 #endif
 #ifdef debugPCD
-		PCDColorize(pcdThis, cloudShowA, 255, 255, 255);
+		PCDColorize(pcdThis, cloudShowA, false);
 #endif
 
 		//Align PCD
