@@ -1,12 +1,6 @@
 #include "defs.h"
 #include "DepthToPCD.hpp"
 
-#ifdef debugPCD
-//#include <pcl/visualization/pcl_visualizer.h>
-//#include <pcl/io/io.h>
-//#include <pcl/io/pcd_io.h>
-#endif
-
 using namespace std;
 
 void cout_messages(std::string message)
@@ -220,8 +214,17 @@ void type_debug(cv::Mat in);
 void saturation(cv::Mat& in, float alpha);
 int hist_max(cv::Mat in);
 void hist_debug(cv::Mat in);
-
 void HoleFill(cv::Mat& image, int iterations = 1);
+
+void downsamplePCD(PCDPtr pcdIO,float size = 0.01)
+{
+	PCDPtr pcd(new PCD);
+	pcl::VoxelGrid<pcl::PointXYZ> grid;
+	grid.setLeafSize(size, size, size);
+	grid.setInputCloud(pcdIO);
+	grid.filter(*pcd);
+	pcdIO = pcd;
+}
 
 void filterDepth(cv::Mat& depth_image)
 {
@@ -235,13 +238,17 @@ void filterDepth(cv::Mat& depth_image)
 
 void preparingDepth(cv::Mat& depth_image)
 {
-	cv::Mat temp;
-
+	cv::Mat temp, temp2, temp3;
+#ifdef resizeSRC
+	cv::resize(depth_image, temp, cv::Size(), 0.66666666666, 0.66666666666, cv::INTER_LANCZOS4);
+	depth_image = temp;
+#endif
 	uchar chans = 1 + (depth_image.type() >> CV_CN_SHIFT);
 	if (chans>1)
 	{
 		//depth_image was an RGB, with same RGBpixel values -> greyscale
-		cv::cvtColor(depth_image, temp, CV_BGR2GRAY);	//rgb->gray
+		cv::cvtColor(depth_image, temp2, CV_BGR2GRAY);	//rgb->gray
+		depth_image = temp2;
 		cout_messages("bgr2gray done");
 	}
 	uchar depth = depth_image.type() & CV_MAT_DEPTH_MASK;
@@ -257,8 +264,8 @@ void preparingDepth(cv::Mat& depth_image)
 	}
 	if (depth)
 	{
-		temp = depth_image;
-		temp.convertTo(depth_image, CV_32FC1);			//unsigned16->float32
+		temp3 = depth_image;
+		temp3.convertTo(depth_image, CV_32FC1);			//unsigned16->float32
 		cout_messages("u2f done");
 	}
 }
@@ -355,28 +362,15 @@ public:
 		out[3] = p.curvature;
 	}
 };
-void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eigen::Matrix4f &final_transform, bool downsample = false)
+void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eigen::Matrix4f &final_transform)
 {
 	//
 	// Downsample for consistency and speed
 	// \note enable this for large datasets
 	PCDPtr src(new PCD);
 	PCDPtr tgt(new PCD);
-	pcl::VoxelGrid<pcl::PointXYZ> grid;
-	if (downsample)
-	{
-		grid.setLeafSize(0.05, 0.05, 0.05);
-		grid.setInputCloud(cloud_src);
-		grid.filter(*src);
-
-		grid.setInputCloud(cloud_tgt);
-		grid.filter(*tgt);
-	}
-	else
-	{
-		src = cloud_src;
-		tgt = cloud_tgt;
-	}
+	src = cloud_src;
+	tgt = cloud_tgt;
 
 
 	// Compute surface normals and curvature
@@ -419,11 +413,11 @@ void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eig
 
 
 	//
-	// Run the same optimization in a loop and visualize the results
+	// Run the same optimization in a loop
 	Eigen::Matrix4f Ti = Eigen::Matrix4f::Identity(), prev, targetToSource;
 	PCDnPtr reg_result = points_with_normals_src;
-	reg.setMaximumIterations(3);//2
-	for (int i = 0; i < 3; ++i)//30
+	reg.setMaximumIterations(2);//2
+	for (int i = 0; i < 30; ++i)//30
 	{
 		PCL_INFO("Iteration Nr. %d.\n", i);
 
@@ -444,9 +438,6 @@ void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eig
 			reg.setMaxCorrespondenceDistance(reg.getMaxCorrespondenceDistance() - 0.001);
 
 		prev = reg.getLastIncrementalTransformation();
-
-		// visualize current state
-		//showCloudsRight(points_with_normals_tgt, points_with_normals_src);
 	}
 
 	//
@@ -477,13 +468,6 @@ void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eig
 	final_transform = targetToSource;
 }
 
-
-
-
-
-
-
-
 int main()
 {
 	std::string workpath, depth_name, amplitude_name;
@@ -491,9 +475,8 @@ int main()
 
 	int loader_iter = ITERATOR_MIN;
 	PCDPtr pcdThis(new PCD());
-	PCDPtr pcdThis2(new PCD());
 	PCDPtr pcdBefore(new PCD());
-
+	PCDPtr finalResult(new PCD());
 	//start visualizer windows
 #ifdef debugPCD
 	boost::thread workerThreadA(visualizeA);
@@ -527,8 +510,9 @@ int main()
 		preparingDepth(depth_image);
 
 		//Filtering
+#ifdef addFilters
 		filterDepth(depth_image);
-
+#endif
 		//Bring up the last PCD
 		if (loader_iter - ITERATOR_MIN > 0)
 		{
@@ -546,79 +530,80 @@ int main()
 			return -1;
 		}
 		cout_messages("DepthToPCD done");
-
-
-		//Show PCD
-#ifdef debugPCD
-		boost::mutex::scoped_lock updateLockA(updateAModelMutex);
-		updateA = false;
-#if shownWindowsNum > 1
-		boost::mutex::scoped_lock updateLockB(updateBModelMutex);
-		updateB = false;
-#endif
-#if shownWindowsNum > 2
-		boost::mutex::scoped_lock updateLockC(updateCModelMutex);
-		updateC = false;
-#endif
-#if shownWindowsNum > 3
-		boost::mutex::scoped_lock updateLockD(updateDModelMutex);
-		updateD = false;
-#endif
-#if shownWindowsNum > 4
-		boost::mutex::scoped_lock updateLockE(updateEModelMutex);
-		updateE = false;
-#endif
-#if shownWindowsNum > 5
-		boost::mutex::scoped_lock updateLockF(updateFModelMutex);
-		updateF = false;
-#endif
-#endif
-#ifdef debugPCD
-		PCDColorize(pcdThis, cloudShowA, false);
-		updateA = true;
-		updateLockA.unlock();
-#if shownWindowsNum > 1
-		updateB = true;
-		updateLockB.unlock();
-#endif
-#if shownWindowsNum > 2
-		updateC = true;
-		updateLockC.unlock();
-#endif
-#if shownWindowsNum > 3
-		updateD = true;
-		updateLockD.unlock();
-#endif
-#if shownWindowsNum > 4
-		updateE = true;
-		updateLockE.unlock();
-#endif 
-#if shownWindowsNum > 5
-		updateF = true;
-		updateLockF.unlock();
-#endif
-#endif
-#ifdef debugPCD
+#ifdef downsampleSRC
+		downsamplePCD(pcdThis);
 #endif
 
 		//Align PCD
-#ifdef Align
+#ifdef addAlign
 		if ((loader_iter - ITERATOR_MIN) > 0)
 		{
 			//Register PCD
 			PCDPtr temp(new PCD), result(new PCD);
-			Eigen::Matrix4f GlobalTransform = Eigen::Matrix4f::Identity(), pairTransform;
-			alignPCD(pcdBefore, pcdThis, temp, pairTransform,true);
+			Eigen::Matrix4f pairTransform;
+			Eigen::Matrix4f GlobalTransform = Eigen::Matrix4f::Identity();
+			alignPCD(pcdBefore, pcdThis, temp, pairTransform);
 			//transform current pair into the global transform
 			pcl::transformPointCloud(*temp, *result, GlobalTransform);
-#ifdef debugPCD
-			//PCDColorize(result, cloudShowB, 255, 255, 255);
-#endif
 			//update the global transform
 			GlobalTransform = GlobalTransform * pairTransform;
-
+			//Visualize align result
+			*finalResult += *result;
+#ifdef downsampleRES
+			downsamplePCD(finalResult,0.05);
+#endif
+#ifdef debugPCD
+			boost::mutex::scoped_lock updateLockA(updateAModelMutex);
+			updateA = false;
+#if shownWindowsNum > 1
+			boost::mutex::scoped_lock updateLockB(updateBModelMutex);
+			updateB = false;
+#endif
+#if shownWindowsNum > 2
+			boost::mutex::scoped_lock updateLockC(updateCModelMutex);
+			updateC = false;
+#endif
+#if shownWindowsNum > 3
+			boost::mutex::scoped_lock updateLockD(updateDModelMutex);
+			updateD = false;
+#endif
+#if shownWindowsNum > 4
+			boost::mutex::scoped_lock updateLockE(updateEModelMutex);
+			updateE = false;
+#endif
+#if shownWindowsNum > 5
+			boost::mutex::scoped_lock updateLockF(updateFModelMutex);
+			updateF = false;
+#endif
+#endif
+#ifdef debugPCD
+			PCDColorize(finalResult, cloudShowA, false);
+			updateA = true;
+			updateLockA.unlock();
+#if shownWindowsNum > 1
+			updateB = true;
+			updateLockB.unlock();
+#endif
+#if shownWindowsNum > 2
+			updateC = true;
+			updateLockC.unlock();
+#endif
+#if shownWindowsNum > 3
+			updateD = true;
+			updateLockD.unlock();
+#endif
+#if shownWindowsNum > 4
+			updateE = true;
+			updateLockE.unlock();
+#endif 
+#if shownWindowsNum > 5
+			updateF = true;
+			updateLockF.unlock();
+#endif
+#endif
+#endif
 			//-------------kibaszott meres ------------------------//
-			/*
+#ifdef addMeasurement
 			double freq = cvGetTickFrequency();
 			int64 e1;
 			int64 e2;
@@ -626,20 +611,15 @@ int main()
 			e1 = cvGetTickCount();
 
 
-
 			//Insert algorithm here!
-
-
 
 
 			e2 = cvGetTickCount();
 			time = (e2 - e1) / freq;
 			cout << time << " sec volt a futasi ido" << endl;
-			*/
-
+#endif
 
 		}
-#endif
 		std::cout << "Picture number: " << loader_iter-ITERATOR_MIN<< std::endl;
 		loader_iter++;
 	}

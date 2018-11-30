@@ -10,10 +10,23 @@ typedef unsigned long long pop_t;
 #include "Intrinsic.hpp"
 #include "Distortion.hpp"
 
+//FUNCTION OPTIONS---------
+#define addFilters
+#define addAlign
+//#define addMeasurement
+
+//functions followups
+#define downsampleRES
+//#define downsampleSRC
+#define resizeSRC
+//-------------------------
+
+
 //DEBUG OPTIONS------------
 #define showStatus
 #define debugPCD
 
+//debug followups
 #ifdef debugPCD
 #define shownWindowsNum 1
 #if shownWindowsNum == 0
