@@ -17,7 +17,7 @@ typedef unsigned long long pop_t;
 #ifdef debugPCD
 #define shownWindowsNum 1
 #if shownWindowsNum == 0
-	#error shownWindowsNum_MustBeGreaterThanZero
+	#undef debugPCD
 #endif
 #endif
 //-------------------------

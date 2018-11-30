@@ -111,33 +111,80 @@ PCDPtr DepthToPCD(cv::Mat in, Intrinsic intr, Distortion dist, std::string image
 
 PCDPtr DepthToPCD(cv::Mat in, int depth_unit)
 {
-	return DepthToPCD(in, depth_unit, 53.8, 84.1);
+	return DepthToPCD(in, depth_unit, 53.87, 84.1);
 }
 
 PCDPtr DepthToPCD(cv::Mat in, int depth_unit, float vert_viewing_angle, float horiz_viewing_angle)
 {
-	float width, height;
-
 	PCDPtr pcd(new PCD(in.cols, in.rows));
 	PCD::PointType n,p;
+	pcd->is_dense = false;
 
-	float transform_w = std::tan(horiz_viewing_angle * M_PI / 180 / 2) * 2;
-	float transform_h = std::tan(vert_viewing_angle * M_PI / 180 / 2) * 2;
+	float width = std::tan(horiz_viewing_angle * M_PI / 180 / 2) * 2;
+	float height = std::tan(vert_viewing_angle * M_PI / 180 / 2) * 2;
 	float depth;
+	int cntr = 0;
 	for (int y = 0; y < in.rows; y++)
 	{
 		for (int x = 0; x < in.cols; x++)
 		{
 			depth = in.at<float>(y, x) / depth_unit;
-			n.x = x / in.cols - 0.5;
-			p.x = n.x * depth * transform_w;
+			if (depth <= 0.0f)
+			{
+				p.x = p.y = p.z = std::numeric_limits<float>::quiet_NaN();
+			}
+			else
+			{
+				n.x = x / (float)in.cols - 0.5;		//(x - in.cols / 2.0) / in.cols
+				p.x = n.x * depth * width;//(x - in.cols / 2.0) / in.cols        * depth * width
 
-			n.y = 0.5 - y / in.rows;
-			p.y =  n.y * depth * transform_h;
+				n.y = 0.5 - y / (float)in.rows;		//(in.rows / 2.0 - y) / in.rows
+				p.y = n.y * depth * height;//(in.rows / 2.0 - y) / in.rows       * depth * height
 
-			p.z = depth;
-			pcd->at(x,y) = p;
+				p.z = depth;
+			}
+			pcd->at(x, y) = p;
 		}
 	}
 	return pcd;
 }
+
+/*
+PCDPtr DepthToPCD2(cv::Mat in, int depth_unit)
+{
+	return DepthToPCD2(in, depth_unit, 53.87, 84.1);
+}
+PCDPtr DepthToPCD2(cv::Mat in, int depth_unit, float vert_viewing_angle, float horiz_viewing_angle)
+{
+	float width, height;
+
+	PCDPtr pcd(new PCD(in.cols, in.rows));
+	PCD::PointType n, p;
+	pcd->is_dense = false;
+	float depth;
+	int cntr = 0;
+	width = std::tan(horiz_viewing_angle * M_PI / 180 / 2) * 2;
+	height = std::tan(vert_viewing_angle * M_PI / 180 / 2) * 2;
+	for (int y = 0; y < in.rows; y++)
+	{
+		for (int x = 0; x < in.cols; x++)
+		{
+			depth = in.at<float>(y, x) / depth_unit;
+			if (depth <= 0.0f)
+			{
+				p.x = p.y = p.z = std::numeric_limits<float>::quiet_NaN();
+			}
+			else
+			{
+
+				p.x = (x - in.cols / 2.0) / in.cols * depth * width;
+
+				p.y = (in.rows / 2.0 - y) / in.rows * depth * height;
+
+				p.z = depth;
+			}
+			pcd->at(x, y) = p;
+		}
+	}
+	return pcd;
+}*/

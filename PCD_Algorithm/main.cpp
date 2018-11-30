@@ -19,24 +19,34 @@ void cout_messages(std::string message)
 #ifdef debugPCD
 void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B);
 
-bool update = false;
-boost::mutex updateModelMutex;
 
+boost::mutex updateAModelMutex;
 PCDcPtr cloudShowA(new PCDc);
+bool updateA = false;
 #if shownWindowsNum > 1
+boost::mutex updateBModelMutex;
 PCDcPtr cloudShowB(new PCDc);
+bool updateB = false;
 #endif
 #if shownWindowsNum > 2
+boost::mutex updateCModelMutex;
 PCDcPtr cloudShowC(new PCDc);
+bool updateC = false;
 #endif
 #if shownWindowsNum > 3
+boost::mutex updateDModelMutex;
 PCDcPtr cloudShowD(new PCDc);
+bool updateD = false;
 #endif
 #if shownWindowsNum > 4
+boost::mutex updateEModelMutex;
 PCDcPtr cloudShowE(new PCDc);
+bool updateE = false;
 #endif
 #if shownWindowsNum > 5
+boost::mutex updateFModelMutex;
 PCDcPtr cloudShowF(new PCDc);
+bool updateF = false;
 #endif
 
 void visualizeA()
@@ -48,14 +58,14 @@ void visualizeA()
 	{
 		viewerA.spinOnce(100);
 		// Get lock on the boolean update and check if cloud was updated
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		if (update)
+		boost::mutex::scoped_lock updateLockA(updateAModelMutex);
+		if (updateA)
 		{
 			if (!viewerA.updatePointCloud(cloudShowA, "Cloud A"))
 				viewerA.addPointCloud(cloudShowA, "Cloud A");
-			update = false;
+			updateA = false;
 		}
-		updateLock.unlock();
+		updateLockA.unlock();
 	}
 }
 
@@ -69,14 +79,14 @@ void visualizeB()
 	{
 		viewerB.spinOnce(100);
 		// Get lock on the boolean update and check if cloud was updated
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		if (update)
+		boost::mutex::scoped_lock updateLockB(updateBModelMutex);
+		if (updateB)
 		{
 			if (!viewerB.updatePointCloud(cloudShowB, "Cloud B"))
 				viewerB.addPointCloud(cloudShowB, "Cloud B");
-			update = false;
+			updateB = false;
 		}
-		updateLock.unlock();
+		updateLockB.unlock();
 	}
 }
 
@@ -91,14 +101,14 @@ void visualizeC()
 	{
 		viewerC.spinOnce(100);
 		// Get lock on the boolean update and check if cloud was updated
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		if (update)
+		boost::mutex::scoped_lock updateLockC(updateCModelMutex);
+		if (updateC)
 		{
 			if (!viewerC.updatePointCloud(cloudShowC, "Cloud C"))
 				viewerC.addPointCloud(cloudShowC, "Cloud C");
-			update = false;
+			updateC = false;
 		}
-		updateLock.unlock();
+		updateLockC.unlock();
 	}
 }
 
@@ -113,14 +123,14 @@ void visualizeD()
 	{
 		viewerD.spinOnce(100);
 		// Get lock on the boolean update and check if cloud was updated
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		if (update)
+		boost::mutex::scoped_lock updateLockD(updateDModelMutex);
+		if (updateD)
 		{
 			if (!viewerD.updatePointCloud(cloudShowD, "Cloud D"))
 				viewerD.addPointCloud(cloudShowD, "Cloud D");
-			update = false;
+			updateD = false;
 		}
-		updateLock.unlock();
+		updateLockD.unlock();
 	}
 }
 
@@ -135,14 +145,14 @@ void visualizeE()
 	{
 		viewerE.spinOnce(100);
 		// Get lock on the boolean update and check if cloud was updated
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		if (update)
+		boost::mutex::scoped_lock updateLockE(updateEModelMutex);
+		if (updateE)
 		{
 			if (!viewerE.updatePointCloud(cloudShowE, "Cloud E"))
 				viewerE.addPointCloud(cloudShowE, "Cloud E");
-			update = false;
+			updateE = false;
 		}
-		updateLock.unlock();
+		updateLockE.unlock();
 	}
 }
 
@@ -157,14 +167,14 @@ void visualizeF()
 	{
 		viewerF.spinOnce(100);
 		// Get lock on the boolean update and check if cloud was updated
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		if (update)
+		boost::mutex::scoped_lock updateLockF(updateFModelMutex);
+		if (updateF)
 		{
 			if (!viewerF.updatePointCloud(cloudShowF, "Cloud F"))
 				viewerF.addPointCloud(cloudShowF, "Cloud F");
-			update = false;
+			updateF = false;
 		}
-		updateLock.unlock();
+		updateLockF.unlock();
 	}
 }
 #endif
@@ -211,12 +221,12 @@ void saturation(cv::Mat& in, float alpha);
 int hist_max(cv::Mat in);
 void hist_debug(cv::Mat in);
 
-void HoleFill(cv::Mat& image);
+void HoleFill(cv::Mat& image, int iterations = 1);
 
 void filterDepth(cv::Mat& depth_image)
 {
 	cv::Mat temp;
-	//HoleFill(depth_image);
+	HoleFill(depth_image);
 	//pcl::removeNaNFromPointCloud(*m.cloud, *m.cloud, indices);
 	cv::medianBlur(depth_image, temp, 3);
 	cv::GaussianBlur(temp, depth_image, cv::Size(3, 3), 1.8);
@@ -481,6 +491,7 @@ int main()
 
 	int loader_iter = ITERATOR_MIN;
 	PCDPtr pcdThis(new PCD());
+	PCDPtr pcdThis2(new PCD());
 	PCDPtr pcdBefore(new PCD());
 
 	//start visualizer windows
@@ -525,10 +536,10 @@ int main()
 		}
 
 		//Making new PCD
-		cv::Mat temp;
-		depth_image.copyTo(temp);
+		//cv::Mat temp;
+		//depth_image.copyTo(temp);
 		//saturation(temp, (float)1 / (float)hist_max(temp));
-		pcdThis = DepthToPCD(depth_image,10.0);
+		pcdThis = DepthToPCD(depth_image,100.0);
 		if (pcdThis == NULL)
 		{
 			cout_messages("PCD is nullpointer");
@@ -539,11 +550,55 @@ int main()
 
 		//Show PCD
 #ifdef debugPCD
-		boost::mutex::scoped_lock updateLock(updateModelMutex);
-		update = true;
+		boost::mutex::scoped_lock updateLockA(updateAModelMutex);
+		updateA = false;
+#if shownWindowsNum > 1
+		boost::mutex::scoped_lock updateLockB(updateBModelMutex);
+		updateB = false;
+#endif
+#if shownWindowsNum > 2
+		boost::mutex::scoped_lock updateLockC(updateCModelMutex);
+		updateC = false;
+#endif
+#if shownWindowsNum > 3
+		boost::mutex::scoped_lock updateLockD(updateDModelMutex);
+		updateD = false;
+#endif
+#if shownWindowsNum > 4
+		boost::mutex::scoped_lock updateLockE(updateEModelMutex);
+		updateE = false;
+#endif
+#if shownWindowsNum > 5
+		boost::mutex::scoped_lock updateLockF(updateFModelMutex);
+		updateF = false;
+#endif
 #endif
 #ifdef debugPCD
 		PCDColorize(pcdThis, cloudShowA, false);
+		updateA = true;
+		updateLockA.unlock();
+#if shownWindowsNum > 1
+		updateB = true;
+		updateLockB.unlock();
+#endif
+#if shownWindowsNum > 2
+		updateC = true;
+		updateLockC.unlock();
+#endif
+#if shownWindowsNum > 3
+		updateD = true;
+		updateLockD.unlock();
+#endif
+#if shownWindowsNum > 4
+		updateE = true;
+		updateLockE.unlock();
+#endif 
+#if shownWindowsNum > 5
+		updateF = true;
+		updateLockF.unlock();
+#endif
+#endif
+#ifdef debugPCD
 #endif
 
 		//Align PCD
@@ -584,9 +639,6 @@ int main()
 
 
 		}
-#endif
-#ifdef debugPCD
-		updateLock.unlock();
 #endif
 		std::cout << "Picture number: " << loader_iter-ITERATOR_MIN<< std::endl;
 		loader_iter++;
@@ -692,7 +744,7 @@ void gethistvalley(cv::Mat imgIn, int* idxOut, double* valueOut, int type, int v
 	*valueOut = -1;
 }
 
-void HoleFill(cv::Mat& image)
+void HoleFill(cv::Mat& image, int iterations)
 {
 	if (image.type() != CV_32FC1)
 	{
@@ -700,12 +752,10 @@ void HoleFill(cv::Mat& image)
 		return;
 	}
 	int kernelSize = 5; //3,5,7..
-	int iterations = 2;
 	double threshold = 1.0;
 
 	iterations = std::max(iterations, 0);
 
-	vector<cv::Point3i> missing;
 
 	for (int i = 0; i < iterations; ++i)
 	{
@@ -759,14 +809,18 @@ void HoleFill(cv::Mat& image)
 						int area = (lim_dx_t - lim_dx_b)*(lim_dy_t - lim_dy_b);
 						if (found >= (area - 1) / 2)
 							image.at<float>(y, x) = res / found;
-						else
+						else if(iterations > 1)
+						{
+							static vector<cv::Point3i> missing;
 							missing.push_back(cv::Point3i(x, y, 1));
+						}
 					}
 				}
 			}
 		}
 		else
 		{
+			static vector<cv::Point3i> missing; //against compile errors
 			for (int counter = 0; counter < missing.size(); counter++)
 			{
 				if (missing[counter].z) //0 if found
@@ -834,18 +888,30 @@ void hist_debug(cv::Mat in)
 		channels.push_back(cv::Mat());
 	}
 	cv::split(in, channels);
+	const uchar depth = in.type() & CV_MAT_DEPTH_MASK; 
+
 	for (int i = 0; i < chs; i++)
 	{
 		cv::Mat inHist = channels[i];
 		cv::Mat hist;
 		int histSize = 2048;
-		float range[] = { 0, 2047 };
+		float range[] = { 0, 65535 };
 		const float* histRange = { range };
 
 		cv::calcHist(&inHist, imgCount, 0, cv::Mat(), hist, 1, &histSize, &histRange);
 		for (int k = 0; k < histSize; k++)
 		{
-			cout << (int)(hist.at<float>(k, 0)) << "db, " << k << " val, " << i << " channel" << endl;
+			switch (depth) {
+			case CV_8U:
+			case CV_8S:
+			case CV_16U:
+			case CV_16S: 
+			case CV_32S:cout << (int)hist.at<float>(k, 0) << "db, " << k << " val, " << i << " channel" << endl; break;
+			case CV_32F:cout << (int)hist.at<float>(k, 0) << "db, " << k << " val, " << i << " channel" << endl; break;
+			case CV_64F:cout << (int)hist.at<float>(k, 0) << "db, " << k << " val, " << i << " channel" << endl; break;
+			default: break;
+			}
+			
 		}
 	}
 
