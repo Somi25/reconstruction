@@ -455,9 +455,17 @@ void downsamplePCD(PCDPtr pcdIO,float size = 0.05)
 void filterDepth(cv::Mat& depth_image)
 {
 	cv::Mat temp;
+#ifdef useHoleFill
 	HoleFill(depth_image);
-	cv::medianBlur(depth_image, temp, 3);
-	cv::GaussianBlur(temp, depth_image, cv::Size(3, 3), 1.8);
+#endif
+#ifdef useMedian
+	cv::medianBlur(depth_image, temp, 5);
+	depth_image = temp;
+#endif
+#ifdef useGaussian
+	cv::GaussianBlur(depth_image, temp, cv::Size(5, 5), 1.8);
+	depth_image = temp;
+#endif
 	cout_messages("filtering done");
 }
 
@@ -471,9 +479,13 @@ void preparingDepth(cv::Mat& depth_image)
 	uchar chans = 1 + (depth_image.type() >> CV_CN_SHIFT);
 	if (chans>1)
 	{
+#ifdef cropSRC
+		cv::Rect myROI(60, 60, depth_image.cols - 60, depth_image.rows - 60);
+		cv::Mat newDepth = depth_image(myROI);
+		depth_image = newDepth;
+#endif
 		//depth_image was an RGB, with same RGBpixel values -> greyscale
 		cv::cvtColor(depth_image, temp2, CV_BGR2GRAY);	//rgb->gray
-		depth_image = temp2;
 		cout_messages("bgr2gray done");
 	}
 	uchar depth = depth_image.type() & CV_MAT_DEPTH_MASK;
@@ -680,7 +692,6 @@ int main()
 #endif
 #endif
 
-
 	while (loader_iter < ITERATOR_MAX)
 	{
 		cv::Mat depth_image, rgb_img;
@@ -704,7 +715,6 @@ int main()
 		}
 
 		//Making new PCD
-		hist_debug(depth_image);
 		pcdThis = DepthToPCD(depth_image, 10.00);
 		if (pcdThis == NULL)
 		{
@@ -749,7 +759,7 @@ int main()
 		//Show some pcds
 #ifdef debugPCD
 		showPCD(pcdThis, 1);
-		showPCD(pcdBefore, 2);
+		//showPCD(pcdBefore, 2);
 #endif
 
 			//-------------kibaszott meres ------------------------//

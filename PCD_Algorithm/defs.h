@@ -20,11 +20,12 @@ typedef unsigned long long pop_t;
 
 //functions followups
 #ifdef addFilters
-#define useHoleFill	//unimplemented define
-#define useMedian	//unimplemented define
-#define useGaussian	//unimplemented define
-#define removeNAN
+#define useHoleFill
+#define useMedian
+#define useGaussian	
 #endif
+#define removeNAN
+//#define cropSRC
 //-------------------------
 
 
@@ -34,7 +35,7 @@ typedef unsigned long long pop_t;
 
 //debug followups 
 #ifdef debugPCD
-#define shownWindowsNum 3	//to change
+#define shownWindowsNum 1	//to change
 //--------
 #if shownWindowsNum < 1
 	#undef debugPCD
