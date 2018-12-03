@@ -362,17 +362,9 @@ public:
 		out[3] = p.curvature;
 	}
 };
-void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eigen::Matrix4f &final_transform)
+
+inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eigen::Matrix4f &final_transform)
 {
-	//
-	// Downsample for consistency and speed
-	// \note enable this for large datasets
-	PCDPtr src(new PCD);
-	PCDPtr tgt(new PCD);
-	src = cloud_src;
-	tgt = cloud_tgt;
-
-
 	// Compute surface normals and curvature
 	PCDnPtr points_with_normals_src(new PCDn);
 	PCDnPtr points_with_normals_tgt(new PCDn);
@@ -382,13 +374,13 @@ void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eig
 	norm_est.setSearchMethod(tree);
 	norm_est.setKSearch(30);
 
-	norm_est.setInputCloud(src);
+	norm_est.setInputCloud(cloud_src);
 	norm_est.compute(*points_with_normals_src);
-	pcl::copyPointCloud(*src, *points_with_normals_src);
+	pcl::copyPointCloud(*cloud_src, *points_with_normals_src);
 
-	norm_est.setInputCloud(tgt);
+	norm_est.setInputCloud(cloud_tgt);
 	norm_est.compute(*points_with_normals_tgt);
-	pcl::copyPointCloud(*tgt, *points_with_normals_tgt);
+	pcl::copyPointCloud(*cloud_tgt, *points_with_normals_tgt);
 
 	//
 	// Instantiate our custom point representation (defined above) ...
