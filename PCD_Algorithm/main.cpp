@@ -10,13 +10,13 @@ void cout_messages(std::string message)
 #endif
 }
 
+//All the functions for showingPCDs
 #ifdef debugPCD
-void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B);
-
-
+#if shownWindowsNum > 0
 boost::mutex updateAModelMutex;
 PCDcPtr cloudShowA(new PCDc);
 bool updateA = false;
+#endif
 #if shownWindowsNum > 1
 boost::mutex updateBModelMutex;
 PCDcPtr cloudShowB(new PCDc);
@@ -43,6 +43,7 @@ PCDcPtr cloudShowF(new PCDc);
 bool updateF = false;
 #endif
 
+#if shownWindowsNum > 0
 void visualizeA()
 {
 	static pcl::visualization::PCLVisualizer viewerA("Show A");
@@ -62,7 +63,7 @@ void visualizeA()
 		updateLockA.unlock();
 	}
 }
-
+#endif
 #if shownWindowsNum > 1
 void visualizeB()
 {
@@ -206,8 +207,82 @@ void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, uint8_t R, uint8_t G, uint8_t B)
 {
 	PCDColorize(inPcd, outPtr, false, R, G, B);
 }
+void showPCD(PCDPtr inPcd, int viewerNum) // viewer num is from 1 - shownWindowsNum
+{
+	if (viewerNum > shownWindowsNum || viewerNum < 1)
+	{
+#ifdef showStatus
+		cout << " viewerNum is not valid in showPCD" << endl;
+#endif
+		return;
+	}
 
+#if shownWindowsNum > 0
+	if (viewerNum == 1)
+	{
+		boost::mutex::scoped_lock updateLockA(updateAModelMutex);
+		updateA = false;
+		PCDColorize(inPcd, cloudShowA, false);
+		updateA = true;
+		updateLockA.unlock();
+	}
+#endif
 
+#if shownWindowsNum > 1
+	if (viewerNum == 2)
+	{
+		boost::mutex::scoped_lock updateLockB(updateBModelMutex);
+		updateB = false;
+		PCDColorize(inPcd, cloudShowB, false);
+		updateB = true;
+		updateLockB.unlock();
+	}
+#endif
+
+#if shownWindowsNum > 2
+	if (viewerNum == 3)
+	{
+		boost::mutex::scoped_lock updateLockC(updateCModelMutex);
+		updateC = false;
+		PCDColorize(inPcd, cloudShowC, false);
+		updateC = true;
+		updateLockC.unlock();
+	}
+#endif
+
+#if shownWindowsNum > 3
+	if (viewerNum == 4)
+	{
+		boost::mutex::scoped_lock updateLockD(updateDModelMutex);
+		updateD = false;
+		PCDColorize(inPcd, cloudShowD, false);
+		updateD = true;
+		updateLockD.unlock();
+	}
+#endif
+
+#if shownWindowsNum > 4
+	if (viewerNum == 5)
+	{
+		boost::mutex::scoped_lock updateLockE(updateEModelMutex);
+		updateE = false;
+		PCDColorize(inPcd, cloudShowE, false);
+		updateE = true;
+		updateLockE.unlock();
+	}
+#endif
+
+#if shownWindowsNum > 5
+	if (viewerNum == 6)
+	{
+		boost::mutex::scoped_lock updateLockF(updateFModelMutex);
+		updateF = false;
+		PCDColorize(inPcd, cloudShowF, false);
+		updateF = true;
+		updateLockF.unlock();
+	}
+#endif
+}
 #endif
 
 void type_debug(cv::Mat in);
@@ -216,12 +291,163 @@ int hist_max(cv::Mat in);
 void hist_debug(cv::Mat in);
 void HoleFill(cv::Mat& image, int iterations = 1);
 
-void downsamplePCD(PCDPtr pcdIO,float size = 0.01)
+void HoleFill(cv::Mat& image, int iterations)
+{
+	if (image.type() != CV_32FC1)
+	{
+		cout_messages("Only CV_32FC1 is supported");
+		return;
+	}
+	int kernelSize = 5; //3,5,7..
+	double threshold = 1.0;
+
+	iterations = std::max(iterations, 0);
+
+
+	for (int i = 0; i < iterations; ++i)
+	{
+		int XX = image.cols;
+		int YY = image.rows;
+		if (i == 0)
+		{
+			for (int y = 0; y < YY; y++)
+			{
+				for (int x = 0; x < XX; x++)
+				{
+					float tmp = image.at<float>(y, x);
+					if (tmp <= threshold || std::isnan(tmp) || std::isinf(tmp))
+					{
+						float res = 0.0f;
+						int found = 0;
+						//define kernel var
+						int kernel_var = (kernelSize - 1) / 2;
+						//calculate limits
+						int lim_dx_b = -kernel_var;
+						int lim_dx_t = kernel_var;
+						int lim_dy_b = -kernel_var;
+						int lim_dy_t = kernel_var;
+						for (int k = 0; k < kernel_var; k++)
+						{
+							if (x == k)
+								lim_dx_b = -k;
+							if (XX - 1 - x == k)
+								lim_dx_t = k;
+							if (y == k)
+								lim_dy_b = -k;
+							if (YY - 1 - y == k)
+								lim_dy_t = k;
+						}
+
+						for (int dx = lim_dx_b; dx <= lim_dx_t; dx++)
+						{
+							for (int dy = lim_dy_b; dy <= lim_dy_t; dy++)
+							{
+								if (x + dx >= 0 && y + dy >= 0 && x + dx < XX && y + dy < YY)
+								{
+									float val = image.at<float>(y + dy, x + dx);
+									if (val > threshold && !std::isnan(val) && !std::isinf(val))
+									{
+										res += val;
+										found++;
+									}
+								}
+							}
+						}
+						int area = (lim_dx_t - lim_dx_b)*(lim_dy_t - lim_dy_b);
+						if (found >= (area - 1) / 2)
+							image.at<float>(y, x) = res / found;
+						else if (iterations > 1)
+						{
+							static vector<cv::Point3i> missing;
+							missing.push_back(cv::Point3i(x, y, 1));
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			static vector<cv::Point3i> missing; //against compile errors
+			for (int counter = 0; counter < missing.size(); counter++)
+			{
+				if (missing[counter].z) //0 if found
+				{
+					int x = missing[counter].x, y = missing[counter].y;
+					float tmp = image.at<float>(y, x);
+					if (tmp <= threshold || std::isnan(tmp) || std::isinf(tmp))
+					{
+						float res = 0.0f;
+						int found = 0;
+						//define kernel var
+						int kernel_var = (kernelSize - 1) / 2;
+						//calculate limits
+						int lim_dx_b = -kernel_var;
+						int lim_dx_t = kernel_var;
+						int lim_dy_b = -kernel_var;
+						int lim_dy_t = kernel_var;
+						for (int k = 0; k < kernel_var; k++)
+						{
+							if (x == k)
+								lim_dx_b = -k;
+							if (XX - 1 - x == k)
+								lim_dx_t = k;
+							if (y == k)
+								lim_dy_b = -k;
+							if (YY - 1 - y == k)
+								lim_dy_t = k;
+						}
+
+						for (int dx = lim_dx_b; dx <= lim_dx_t; dx++)
+						{
+							for (int dy = lim_dy_b; dy <= lim_dy_t; dy++)
+							{
+								if (x + dx >= 0 && y + dy >= 0 && x + dx < XX && y + dy < YY)
+								{
+									float val = image.at<float>(y + dy, x + dx);
+									if (val > threshold && !std::isnan(val) && !std::isinf(val))
+									{
+										res += val;
+										found++;
+									}
+								}
+							}
+						}
+						int area = (lim_dx_t - lim_dx_b)*(lim_dy_t - lim_dy_b);
+						if (found >= (area - 1) / 2)
+						{
+							image.at<float>(y, x) = res / found;
+							missing[counter].z = 0;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void saturation(cv::Mat& in, float alpha)
+{
+	if (in.type() != CV_32FC1)
+	{
+		cout_messages("Only CV_32FC1 is supported");
+		return;
+	}
+	for (int y = 0; y < in.rows; y++)
+	{
+		for (int x = 0; x < in.cols; x++)
+		{
+			in.at<float>(y, x) *= alpha;
+		}
+	}
+}
+
+void downsamplePCD(PCDPtr pcdIO,float size = 0.05)
 {
 	PCDPtr pcd(new PCD);
+	Eigen::Vector3i min;
 	pcl::VoxelGrid<pcl::PointXYZ> grid;
-	grid.setLeafSize(size, size, size);
 	grid.setInputCloud(pcdIO);
+	grid.setLeafSize(size, size, size);
 	grid.filter(*pcd);
 	pcdIO = pcd;
 }
@@ -230,7 +456,6 @@ void filterDepth(cv::Mat& depth_image)
 {
 	cv::Mat temp;
 	HoleFill(depth_image);
-	//pcl::removeNaNFromPointCloud(*m.cloud, *m.cloud, indices);
 	cv::medianBlur(depth_image, temp, 3);
 	cv::GaussianBlur(temp, depth_image, cv::Size(3, 3), 1.8);
 	cout_messages("filtering done");
@@ -389,7 +614,6 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 	float alpha[4] = { 1.0, 1.0, 1.0, 1.0 };
 	point_representation.setRescaleValues(alpha);
 
-	//
 	// Align
 	pcl::IterativeClosestPointNonLinear<PCDnPoint, PCDnPoint> reg;
 	reg.setTransformationEpsilon(1e-6);
@@ -402,63 +626,27 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 	reg.setInputSource(points_with_normals_src);
 	reg.setInputTarget(points_with_normals_tgt);
 
-
-
-	//
-	// Run the same optimization in a loop
+	//Optimize
 	Eigen::Matrix4f Ti = Eigen::Matrix4f::Identity(), prev, targetToSource;
-	PCDnPtr reg_result = points_with_normals_src;
-	reg.setMaximumIterations(2);//2
-	for (int i = 0; i < 30; ++i)//30
-	{
-		PCL_INFO("Iteration Nr. %d.\n", i);
+	reg.setMaximumIterations(30);//30
 
-		// save cloud for visualization purpose
-		points_with_normals_src = reg_result;
-
-		// Estimate
-		reg.setInputSource(points_with_normals_src);
-		reg.align(*reg_result);
-
-		//accumulate transformation between each Iteration
-		Ti = reg.getFinalTransformation() * Ti;
-
-		//if the difference between this transformation and the previous one
-		//is smaller than the threshold, refine the process by reducing
-		//the maximal correspondence distance
-		if (fabs((reg.getLastIncrementalTransformation() - prev).sum()) < reg.getTransformationEpsilon())
-			reg.setMaxCorrespondenceDistance(reg.getMaxCorrespondenceDistance() - 0.001);
-
-		prev = reg.getLastIncrementalTransformation();
-	}
-
+	reg.align(*points_with_normals_src);
+	//accumulate transformation between each Iteration
+	Ti = reg.getFinalTransformation() * Ti;
 	//
-  // Get the transformation from target to source
+	// Get the transformation from target to source
 	targetToSource = Ti.inverse();
 
-	//
 	// Transform target back in source frame
 	pcl::transformPointCloud(*cloud_tgt, *output, targetToSource);
-	/*
-	p->removePointCloud("source");
-	p->removePointCloud("target");
 
-	PointCloudColorHandlerCustom<PointT> cloud_tgt_h(output, 0, 255, 0);
-	PointCloudColorHandlerCustom<PointT> cloud_src_h(cloud_src, 255, 0, 0);
-	p->addPointCloud(output, cloud_tgt_h, "target", vp_2);
-	p->addPointCloud(cloud_src, cloud_src_h, "source", vp_2);
-
-	PCL_INFO("Press q to continue the registration.\n");
-	p->spin();
-
-	p->removePointCloud("source");
-	p->removePointCloud("target");
-	*/
 	//add the source to the transformed target
 	*output += *cloud_src;
 
 	final_transform = targetToSource;
 }
+
+//main--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 int main()
 {
@@ -469,9 +657,12 @@ int main()
 	PCDPtr pcdThis(new PCD());
 	PCDPtr pcdBefore(new PCD());
 	PCDPtr finalResult(new PCD());
-	//start visualizer windows
+
+	//Open visualizing threads
 #ifdef debugPCD
+#if shownWindowsNum > 0
 	boost::thread workerThreadA(visualizeA);
+#endif
 #if shownWindowsNum > 1
 	boost::thread workerThreadB(visualizeB);
 #endif
@@ -488,6 +679,7 @@ int main()
 	boost::thread workerThreadF(visualizeF);
 #endif
 #endif
+
 
 	while (loader_iter < ITERATOR_MAX)
 	{
@@ -508,22 +700,26 @@ int main()
 		//Bring up the last PCD
 		if (loader_iter - ITERATOR_MIN > 0)
 		{
-			pcdBefore = pcdThis; //"Before": all before, "this": from this depth img.
+			pcdBefore = pcdThis;
 		}
 
 		//Making new PCD
-		//cv::Mat temp;
-		//depth_image.copyTo(temp);
-		//saturation(temp, (float)1 / (float)hist_max(temp));
-		pcdThis = DepthToPCD(depth_image,100.0);
+		hist_debug(depth_image);
+		pcdThis = DepthToPCD(depth_image, 10.00);
 		if (pcdThis == NULL)
 		{
 			cout_messages("PCD is nullpointer");
 			return -1;
 		}
 		cout_messages("DepthToPCD done");
+
 #ifdef downsampleSRC
 		downsamplePCD(pcdThis);
+#endif
+
+#ifdef removeNAN
+		std::vector<int> indices;
+		pcl::removeNaNFromPointCloud(*pcdThis, *pcdThis, indices);
 #endif
 
 		//Align PCD
@@ -542,82 +738,46 @@ int main()
 			//Visualize align result
 			*finalResult += *result;
 #ifdef downsampleRES
-			downsamplePCD(finalResult,0.05);
+			downsamplePCD(finalResult,0.5);
 #endif
+			//show result
 #ifdef debugPCD
-			boost::mutex::scoped_lock updateLockA(updateAModelMutex);
-			updateA = false;
-#if shownWindowsNum > 1
-			boost::mutex::scoped_lock updateLockB(updateBModelMutex);
-			updateB = false;
+			showPCD(finalResult, 3);
 #endif
-#if shownWindowsNum > 2
-			boost::mutex::scoped_lock updateLockC(updateCModelMutex);
-			updateC = false;
+		}
 #endif
-#if shownWindowsNum > 3
-			boost::mutex::scoped_lock updateLockD(updateDModelMutex);
-			updateD = false;
-#endif
-#if shownWindowsNum > 4
-			boost::mutex::scoped_lock updateLockE(updateEModelMutex);
-			updateE = false;
-#endif
-#if shownWindowsNum > 5
-			boost::mutex::scoped_lock updateLockF(updateFModelMutex);
-			updateF = false;
-#endif
-#endif
+		//Show some pcds
 #ifdef debugPCD
-			PCDColorize(finalResult, cloudShowA, false);
-			updateA = true;
-			updateLockA.unlock();
-#if shownWindowsNum > 1
-			updateB = true;
-			updateLockB.unlock();
+		showPCD(pcdThis, 1);
+		showPCD(pcdBefore, 2);
 #endif
-#if shownWindowsNum > 2
-			updateC = true;
-			updateLockC.unlock();
-#endif
-#if shownWindowsNum > 3
-			updateD = true;
-			updateLockD.unlock();
-#endif
-#if shownWindowsNum > 4
-			updateE = true;
-			updateLockE.unlock();
-#endif 
-#if shownWindowsNum > 5
-			updateF = true;
-			updateLockF.unlock();
-#endif
-#endif
-#endif
+
 			//-------------kibaszott meres ------------------------//
 #ifdef addMeasurement
-			double freq = cvGetTickFrequency();
-			int64 e1;
-			int64 e2;
-			double time;
-			e1 = cvGetTickCount();
+		double freq = cvGetTickFrequency();
+		int64 e1;
+		int64 e2;
+		double time;
+		e1 = cvGetTickCount();
 
 
-			//Insert algorithm here!
+		//Insert algorithm here!
 
 
-			e2 = cvGetTickCount();
-			time = (e2 - e1) / freq;
-			cout << time << " sec volt a futasi ido" << endl;
+		e2 = cvGetTickCount();
+		time = (e2 - e1) / freq;
+		cout << time << " sec volt a futasi ido" << endl;
 #endif
 
-		}
 		std::cout << "Picture number: " << loader_iter-ITERATOR_MIN<< std::endl;
 		loader_iter++;
 	}
-	//join threads
+
+	//join visualizing threads
 #ifdef debugPCD
+#if shownWindowsNum > 0
 	workerThreadA.join();
+#endif
 #if shownWindowsNum > 1
 	workerThreadB.join();
 #endif
@@ -634,26 +794,12 @@ int main()
 	workerThreadF.join();
 #endif
 #endif
+
 	return 0;
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//Functions from former projects
+//Functions from former projects----------------------------------------------------------------------------------------------------------
 
 
 #define HIGH2LOW 0
@@ -716,140 +862,6 @@ void gethistvalley(cv::Mat imgIn, int* idxOut, double* valueOut, int type, int v
 	*valueOut = -1;
 }
 
-void HoleFill(cv::Mat& image, int iterations)
-{
-	if (image.type() != CV_32FC1)
-	{
-		cout_messages("Only CV_32FC1 is supported");
-		return;
-	}
-	int kernelSize = 5; //3,5,7..
-	double threshold = 1.0;
-
-	iterations = std::max(iterations, 0);
-
-
-	for (int i = 0; i < iterations; ++i)
-	{
-		int XX = image.cols;
-		int YY = image.rows;
-		if (i == 0)
-		{
-			for (int y = 0; y < YY; y++)
-			{
-				for (int x = 0; x < XX; x++)
-				{
-					float tmp = image.at<float>(y, x);
-					if (tmp <= threshold || std::isnan(tmp) || std::isinf(tmp))
-					{
-						float res = 0.0f;
-						int found = 0;
-						//define kernel var
-						int kernel_var = (kernelSize - 1) / 2;
-						//calculate limits
-						int lim_dx_b = -kernel_var;
-						int lim_dx_t = kernel_var;
-						int lim_dy_b = -kernel_var;
-						int lim_dy_t = kernel_var;
-						for (int k = 0; k < kernel_var; k++)
-						{
-							if (x == k)
-								lim_dx_b = -k;
-							if (XX - 1 - x == k)
-								lim_dx_t = k;
-							if (y == k)
-								lim_dy_b = -k;
-							if (YY - 1 - y == k)
-								lim_dy_t = k;
-						}
-
-						for (int dx = lim_dx_b; dx <= lim_dx_t; dx++)
-						{
-							for (int dy = lim_dy_b; dy <= lim_dy_t; dy++)
-							{
-								if (x + dx >= 0 && y + dy >= 0 && x + dx < XX && y + dy < YY)
-								{
-									float val = image.at<float>(y + dy, x + dx);
-									if (val > threshold && !std::isnan(val) && !std::isinf(val))
-									{
-										res += val;
-										found++;
-									}
-								}
-							}
-						}
-						int area = (lim_dx_t - lim_dx_b)*(lim_dy_t - lim_dy_b);
-						if (found >= (area - 1) / 2)
-							image.at<float>(y, x) = res / found;
-						else if(iterations > 1)
-						{
-							static vector<cv::Point3i> missing;
-							missing.push_back(cv::Point3i(x, y, 1));
-						}
-					}
-				}
-			}
-		}
-		else
-		{
-			static vector<cv::Point3i> missing; //against compile errors
-			for (int counter = 0; counter < missing.size(); counter++)
-			{
-				if (missing[counter].z) //0 if found
-				{
-					int x = missing[counter].x, y = missing[counter].y;
-					float tmp = image.at<float>(y, x);
-					if (tmp <= threshold || std::isnan(tmp) || std::isinf(tmp))
-					{
-						float res = 0.0f;
-						int found = 0;
-						//define kernel var
-						int kernel_var = (kernelSize - 1) / 2;
-						//calculate limits
-						int lim_dx_b = -kernel_var;
-						int lim_dx_t = kernel_var;
-						int lim_dy_b = -kernel_var;
-						int lim_dy_t = kernel_var;
-						for (int k = 0; k < kernel_var; k++)
-						{
-							if (x == k)
-								lim_dx_b = -k;
-							if (XX - 1 - x == k)
-								lim_dx_t = k;
-							if (y == k)
-								lim_dy_b = -k;
-							if (YY - 1 - y == k)
-								lim_dy_t = k;
-						}
-
-						for (int dx = lim_dx_b; dx <= lim_dx_t; dx++)
-						{
-							for (int dy = lim_dy_b; dy <= lim_dy_t; dy++)
-							{
-								if (x + dx >= 0 && y + dy >= 0 && x + dx < XX && y + dy < YY)
-								{
-									float val = image.at<float>(y + dy, x + dx);
-									if (val > threshold && !std::isnan(val) && !std::isinf(val))
-									{
-										res += val;
-										found++;
-									}
-								}
-							}
-						}
-						int area = (lim_dx_t - lim_dx_b)*(lim_dy_t - lim_dy_b);
-						if (found >= (area - 1) / 2)
-						{
-							image.at<float>(y, x) = res / found;
-							missing[counter].z = 0;
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
 void hist_debug(cv::Mat in)
 {
 	int imgCount = 1;
@@ -873,7 +885,8 @@ void hist_debug(cv::Mat in)
 		cv::calcHist(&inHist, imgCount, 0, cv::Mat(), hist, 1, &histSize, &histRange);
 		for (int k = 0; k < histSize; k++)
 		{
-			switch (depth) {
+			switch (depth) 
+			{
 			case CV_8U:
 			case CV_8S:
 			case CV_16U:
@@ -886,7 +899,6 @@ void hist_debug(cv::Mat in)
 			
 		}
 	}
-
 }
 
 int hist_max(cv::Mat in)
@@ -937,20 +949,4 @@ void type_debug(cv::Mat in)
 	r += "C";
 	r += (chans + '0');
 	cout << r << endl;
-}
-
-void saturation(cv::Mat& in,float alpha)
-{
-	if (in.type() != CV_32FC1)
-	{
-		cout_messages("Only CV_32FC1 is supported");
-		return;
-	}
-	for (int y = 0; y < in.rows; y++)
-	{
-		for (int x = 0; x < in.cols; x++)
-		{
-			in.at<float>(y, x) *= alpha;
-		}
-	}
 }

@@ -12,13 +12,19 @@ typedef unsigned long long pop_t;
 
 //FUNCTION OPTIONS---------
 #define addFilters
-#define addAlign
+//#define addAlign
+#define downsampleRES
+#define downsampleSRC
+#define resizeSRC
 //#define addMeasurement
 
 //functions followups
-#define downsampleRES
-//#define downsampleSRC
-#define resizeSRC
+#ifdef addFilters
+#define useHoleFill	//unimplemented define
+#define useMedian	//unimplemented define
+#define useGaussian	//unimplemented define
+#define removeNAN
+#endif
 //-------------------------
 
 
@@ -26,11 +32,16 @@ typedef unsigned long long pop_t;
 #define showStatus
 #define debugPCD
 
-//debug followups
+//debug followups 
 #ifdef debugPCD
-#define shownWindowsNum 1
-#if shownWindowsNum == 0
+#define shownWindowsNum 3	//to change
+//--------
+#if shownWindowsNum < 1
 	#undef debugPCD
+#endif
+#if shownWindowsNum > 6
+#undef shownWindowsNum
+#define shownWindowsNum 6
 #endif
 #endif
 //-------------------------
