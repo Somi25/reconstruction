@@ -288,7 +288,7 @@ void showPCD(PCDPtr inPcd, int viewerNum) // viewer num is from 1 - shownWindows
 void type_debug(cv::Mat in);
 void saturation(cv::Mat& in, float alpha);
 int hist_max(cv::Mat in);
-void hist_debug(cv::Mat in);
+void hist_debug(cv::Mat in, bool interestInHoleFill);
 void HoleFill(cv::Mat& image, int iterations = 1);
 
 void HoleFill(cv::Mat& image, int iterations)
@@ -298,7 +298,7 @@ void HoleFill(cv::Mat& image, int iterations)
 		cout_messages("Only CV_32FC1 is supported");
 		return;
 	}
-	int kernelSize = 5; //3,5,7..
+	int kernelSize = holeFillKERNEL; //3,5,7..
 	double threshold = 1.0;
 
 	iterations = std::max(iterations, 0);
@@ -459,34 +459,33 @@ void filterDepth(cv::Mat& depth_image)
 	HoleFill(depth_image);
 #endif
 #ifdef useMedian
-	cv::medianBlur(depth_image, temp, 5);
+	cv::medianBlur(depth_image, temp, medianKERNEL);
 	depth_image = temp;
 #endif
 #ifdef useGaussian
 	cv::GaussianBlur(depth_image, temp, cv::Size(5, 5), 1.8);
 	depth_image = temp;
 #endif
-	cout_messages("filtering done");
 }
 
 void preparingDepth(cv::Mat& depth_image)
 {
 	cv::Mat temp, temp2, temp3;
 #ifdef resizeSRC
-	cv::resize(depth_image, temp, cv::Size(), 0.66666666666, 0.66666666666, cv::INTER_LANCZOS4);
+	cv :: Size newSize(1366,768);
+	cv::resize(depth_image, temp, newSize,0,0, cv::INTER_LANCZOS4);
 	depth_image = temp;
+#endif
+#ifdef useCrop
+	cv::Rect myROI(60, 60, depth_image.cols - 60, depth_image.rows - 60);
+	cv::Mat newDepth = depth_image(myROI);
+	depth_image = newDepth;
 #endif
 	uchar chans = 1 + (depth_image.type() >> CV_CN_SHIFT);
 	if (chans>1)
 	{
-#ifdef cropSRC
-		cv::Rect myROI(60, 60, depth_image.cols - 60, depth_image.rows - 60);
-		cv::Mat newDepth = depth_image(myROI);
-		depth_image = newDepth;
-#endif
 		//depth_image was an RGB, with same RGBpixel values -> greyscale
 		cv::cvtColor(depth_image, temp2, CV_BGR2GRAY);	//rgb->gray
-		cout_messages("bgr2gray done");
 	}
 	uchar depth = depth_image.type() & CV_MAT_DEPTH_MASK;
 	switch (depth) {
@@ -503,7 +502,6 @@ void preparingDepth(cv::Mat& depth_image)
 	{
 		temp3 = depth_image;
 		temp3.convertTo(depth_image, CV_32FC1);			//unsigned16->float32
-		cout_messages("u2f done");
 	}
 }
 
@@ -578,6 +576,29 @@ inline int loadImages(cv::Mat& depth, cv::Mat& rgb, std::string& path, std::stri
 	return 1;
 }
 
+inline void smoothingPCD(PCDPtr in,float rad)
+{
+	pcl::search::KdTree<PCDPoint>::Ptr tree(new pcl::search::KdTree<PCDPoint>);
+
+	// Output has the PointNormal type in order to store the normals calculated by MLS
+	PCDn mls_points;
+
+	// Init object (second point type is for the normals, even if unused)
+	pcl::MovingLeastSquares<PCDPoint, PCDnPoint> mls;
+
+	mls.setComputeNormals(true);
+
+	// Set parameters
+	mls.setInputCloud(in);
+	mls.setPolynomialFit(true);
+	mls.setSearchMethod(tree);
+	mls.setSearchRadius(rad);
+
+	// Reconstruct
+	mls.process(mls_points);
+	pcl::copyPointCloud(mls_points, *in);
+}
+
 // Define a new point representation for < x, y, z, curvature >
 class MyPointRepresentation : public pcl::PointRepresentation <PCDnPoint>
 {
@@ -606,15 +627,16 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 	PCDnPtr points_with_normals_src(new PCDn);
 	PCDnPtr points_with_normals_tgt(new PCDn);
 
+	//normal estimation
 	pcl::NormalEstimation<PCDPoint, PCDnPoint> norm_est;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
 	norm_est.setSearchMethod(tree);
 	norm_est.setKSearch(30);
-
+		//for source
 	norm_est.setInputCloud(cloud_src);
 	norm_est.compute(*points_with_normals_src);
 	pcl::copyPointCloud(*cloud_src, *points_with_normals_src);
-
+		//for target
 	norm_est.setInputCloud(cloud_tgt);
 	norm_est.compute(*points_with_normals_tgt);
 	pcl::copyPointCloud(*cloud_tgt, *points_with_normals_tgt);
@@ -703,10 +725,12 @@ int main()
 
 		//Conversion
 		preparingDepth(depth_image);
+		cout_messages("preparingDepth done");
 
 		//Filtering
 #ifdef addFilters
 		filterDepth(depth_image);
+		cout_messages("filtering done");
 #endif
 		//Bring up the last PCD
 		if (loader_iter - ITERATOR_MIN > 0)
@@ -715,7 +739,7 @@ int main()
 		}
 
 		//Making new PCD
-		pcdThis = DepthToPCD(depth_image, 10.00);
+		pcdThis = DepthToPCD(depth_image, 100.0);
 		if (pcdThis == NULL)
 		{
 			cout_messages("PCD is nullpointer");
@@ -723,15 +747,23 @@ int main()
 		}
 		cout_messages("DepthToPCD done");
 
-#ifdef downsampleSRC
-		downsamplePCD(pcdThis);
-#endif
-
 #ifdef removeNAN
 		std::vector<int> indices;
 		pcl::removeNaNFromPointCloud(*pcdThis, *pcdThis, indices);
+		cout_messages("removeNaN done");
 #endif
-
+#ifdef downsampleSRC
+		downsamplePCD(pcdThis, downsampleRate);
+		cout_messages("downsamplePCD done");
+#endif
+#ifdef smoothingSRC
+		smoothingPCD(pcdThis, searchRAD_SRC);
+		cout_messages("smoothingPCD done");
+#endif
+#ifdef downsampleSRC
+		downsamplePCD(pcdThis, downsampleRate_SRC);
+		cout_messages("downsamplePCD done");
+#endif
 		//Align PCD
 #ifdef addAlign
 		if ((loader_iter - ITERATOR_MIN) > 0)
@@ -741,25 +773,31 @@ int main()
 			Eigen::Matrix4f pairTransform;
 			Eigen::Matrix4f GlobalTransform = Eigen::Matrix4f::Identity();
 			alignPCD(pcdBefore, pcdThis, temp, pairTransform);
+			cout_messages("alignPCD done");
 			//transform current pair into the global transform
 			pcl::transformPointCloud(*temp, *result, GlobalTransform);
 			//update the global transform
 			GlobalTransform = GlobalTransform * pairTransform;
 			//Visualize align result
 			*finalResult += *result;
+			cout_messages("finalResult done");
 #ifdef downsampleRES
-			downsamplePCD(finalResult,0.5);
+			downsamplePCD(finalResult, downsampleRate_RES);
+			cout_messages("downsamplePCD done");
+#endif
+#ifdef smoothingRES
+			smoothingPCD(finalResult, searchRAD_RES);
+			cout_messages("smoothingPCD done");
 #endif
 			//show result
 #ifdef debugPCD
-			showPCD(finalResult, 3);
+			showPCD(finalResult, 1);
 #endif
 		}
 #endif
 		//Show some pcds
 #ifdef debugPCD
-		showPCD(pcdThis, 1);
-		//showPCD(pcdBefore, 2);
+		cout_messages("show..");
 #endif
 
 			//-------------kibaszott meres ------------------------//
@@ -872,7 +910,7 @@ void gethistvalley(cv::Mat imgIn, int* idxOut, double* valueOut, int type, int v
 	*valueOut = -1;
 }
 
-void hist_debug(cv::Mat in)
+void hist_debug(cv::Mat in, bool interestInHoleFill)
 {
 	int imgCount = 1;
 	const int chs = in.channels();
@@ -893,7 +931,7 @@ void hist_debug(cv::Mat in)
 		const float* histRange = { range };
 
 		cv::calcHist(&inHist, imgCount, 0, cv::Mat(), hist, 1, &histSize, &histRange);
-		for (int k = 0; k < histSize; k++)
+		for (int k = 0; interestInHoleFill ? k==0 : (k < histSize) ; k++)
 		{
 			switch (depth) 
 			{

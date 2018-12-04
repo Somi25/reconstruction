@@ -25,4 +25,5 @@
 #include <pcl/registration/icp.h>
 #include <pcl/registration/icp_nl.h>
 #include <pcl/registration/transforms.h>
+#include <pcl/surface/mls.h>
 #include <pcl/visualization/cloud_viewer.h>
