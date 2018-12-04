@@ -289,6 +289,7 @@ void type_debug(cv::Mat in);
 void saturation(cv::Mat& in, float alpha);
 int hist_max(cv::Mat in);
 void hist_debug(cv::Mat in, bool interestInHoleFill);
+#ifdef useHoleFill
 void HoleFill(cv::Mat& image, int iterations = 1);
 
 void HoleFill(cv::Mat& image, int iterations)
@@ -424,7 +425,7 @@ void HoleFill(cv::Mat& image, int iterations)
 		}
 	}
 }
-
+#endif
 void saturation(cv::Mat& in, float alpha)
 {
 	if (in.type() != CV_32FC1)
@@ -662,7 +663,7 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 
 	//Optimize
 	Eigen::Matrix4f Ti = Eigen::Matrix4f::Identity(), prev, targetToSource;
-	reg.setMaximumIterations(30);//30
+	reg.setMaximumIterations(ICP_IterNum);
 
 	reg.align(*points_with_normals_src);
 	//accumulate transformation between each Iteration

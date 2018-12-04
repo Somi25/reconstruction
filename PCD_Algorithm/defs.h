@@ -14,17 +14,17 @@ typedef unsigned long long pop_t;
 #define addFilters
 #define addAlign
 #define removeNAN
-#define smoothingSRC
+//#define smoothingSRC
 //#define downsampleSRC
-#define smoothingRES
+//#define smoothingRES
 //#define downsampleRES
 //#define resizeSRC
 //#define addMeasurement
 
 //functions followups
 #ifdef addFilters
-#define useHoleFill
-#define useMedian
+//#define useHoleFill
+//#define useMedian
 //#define useGaussian	
 //#define useCrop
 #endif
@@ -46,11 +46,14 @@ typedef unsigned long long pop_t;
 #ifdef useHoleFill
 #define holeFillKERNEL 5
 #endif
+#ifdef addAlign
+#define ICP_IterNum 10
+#endif
 //-------------------------
 
 
 //DEBUG OPTIONS------------
-#define showStatus
+//#define showStatus
 #define debugPCD
 
 //debug followups 
