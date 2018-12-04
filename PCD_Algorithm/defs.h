@@ -12,20 +12,40 @@ typedef unsigned long long pop_t;
 
 //FUNCTION OPTIONS---------
 #define addFilters
-//#define addAlign
-#define downsampleRES
-#define downsampleSRC
-#define resizeSRC
+#define addAlign
+#define removeNAN
+#define smoothingSRC
+//#define downsampleSRC
+#define smoothingRES
+//#define downsampleRES
+//#define resizeSRC
 //#define addMeasurement
 
 //functions followups
 #ifdef addFilters
 #define useHoleFill
 #define useMedian
-#define useGaussian	
+//#define useGaussian	
+//#define useCrop
 #endif
-#define removeNAN
-//#define cropSRC
+#ifdef downsampleSRC //not working
+#define downsampleRate_SRC 2
+#endif
+#ifdef downsampleRES //not working
+#define downsampleRate_RES 2
+#endif
+#ifdef smoothingSRC
+#define searchRAD_SRC 0.03 //works with 0.05
+#endif
+#ifdef smoothingRES
+#define searchRAD_RES 0.04 
+#endif
+#ifdef useMedian
+#define medianKERNEL 5
+#endif
+#ifdef useHoleFill
+#define holeFillKERNEL 5
+#endif
 //-------------------------
 
 
