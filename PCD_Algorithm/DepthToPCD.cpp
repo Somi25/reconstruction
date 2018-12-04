@@ -141,7 +141,7 @@ PCDPtr DepthToPCD(cv::Mat in, int depth_unit, float vert_viewing_angle, float ho
 				n.y = 0.5 - y / (float)in.rows;		//(in.rows / 2.0 - y) / in.rows
 				p.y = n.y * depth * height;//(in.rows / 2.0 - y) / in.rows       * depth * height
 
-				p.z = depth;
+				p.z = -depth;
 			}
 			pcd->at(x, y) = p;
 		}
