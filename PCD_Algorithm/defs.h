@@ -20,34 +20,42 @@ typedef unsigned long long pop_t;
 //#define downsampleRES
 //#define resizeSRC
 //#define addMeasurement
+#define saveInputPCD
+#define saveAlignedPCD
 
 //functions followups
 #ifdef addFilters
-//#define useHoleFill
-//#define useMedian
-//#define useGaussian	
-//#define useCrop
+	//#define useHoleFill
+	//#define useMedian
+	//#define useGaussian	
+	//#define useCrop
 #endif
 #ifdef downsampleSRC //not working
-#define downsampleRate_SRC 2
+	#define downsampleRate_SRC 2
 #endif
 #ifdef downsampleRES //not working
-#define downsampleRate_RES 2
+	#define downsampleRate_RES 2
 #endif
 #ifdef smoothingSRC
-#define searchRAD_SRC 0.03 //works with 0.05
+	#define searchRAD_SRC 0.03 //works with 0.05
 #endif
 #ifdef smoothingRES
-#define searchRAD_RES 0.04 
+	#define searchRAD_RES 0.04 
 #endif
 #ifdef useMedian
-#define medianKERNEL 5
+	#define medianKERNEL 5
 #endif
 #ifdef useHoleFill
-#define holeFillKERNEL 5
+	#define holeFillKERNEL 5
 #endif
 #ifdef addAlign
-#define ICP_IterNum 10
+	#define ICP_IterNum 10
+#endif
+#ifdef saveAlignedPCD //SAP
+	#define SAP_saveOriginal
+	#if (defined smoothingRES || defined downsampleRES)
+		#define SAP_saveFiltered
+	#endif
 #endif
 //-------------------------
 

@@ -747,6 +747,10 @@ int main()
 			return -1;
 		}
 		cout_messages("DepthToPCD done");
+#ifdef saveInputPCD
+		pcl::io::savePCDFileASCII("PCDs/input/inputPCD_" + std::to_string(loader_iter-ITERATOR_MIN) + ".pcd", *pcdThis);
+		cout_messages("SavingInPCD done");
+#endif
 
 #ifdef removeNAN
 		std::vector<int> indices;
@@ -782,6 +786,10 @@ int main()
 			//Visualize align result
 			*finalResult += *result;
 			cout_messages("finalResult done");
+#ifdef SAP_saveOriginal
+			pcl::io::savePCDFileASCII("PCDs/output/outputN_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
+			cout_messages("SavingInPCD done");
+#endif
 #ifdef downsampleRES
 			downsamplePCD(finalResult, downsampleRate_RES);
 			cout_messages("downsamplePCD done");
@@ -789,6 +797,10 @@ int main()
 #ifdef smoothingRES
 			smoothingPCD(finalResult, searchRAD_RES);
 			cout_messages("smoothingPCD done");
+#endif
+#ifdef SAP_saveFiltered
+			pcl::io::savePCDFileASCII("PCDs/output/outputF_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
+			cout_messages("SavingInPCD done");
 #endif
 			//show result
 #ifdef debugPCD
