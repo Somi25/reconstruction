@@ -779,14 +779,18 @@ int main()
 			cout_messages("alignPCD done");
 			//transform current pair into the global transform
 			pcl::transformPointCloud(*temp, *result, GlobalTransform);
+			string message = "result size: \t" + std::to_string(result->size());
+			cout_messages(message);
 			//update the global transform
 			GlobalTransform = GlobalTransform * pairTransform;
 			//Visualize align result
 			*finalResult += *result;
 			cout_messages("finalResult done");
+			message = "finalResult_Orig size: " + std::to_string(finalResult->size());
+			cout_messages(message);
 #ifdef SAP_saveOriginal
 			pcl::io::savePCDFileASCII("PCDs/output/outputN_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
-			cout_messages("SavingInPCD done");
+			cout_messages("SavingOutNPCD done");
 #endif
 #ifdef downsampleRES
 			downsamplePCD(finalResult, downsampleRate_RES);
@@ -795,10 +799,12 @@ int main()
 #ifdef smoothingRES
 			smoothingPCD(finalResult, searchRAD_RES);
 			cout_messages("smoothingPCD done");
+			message = "finalResult_Filt size: " + std::to_string(finalResult->size());
+			cout_messages(message);
 #endif
 #ifdef SAP_saveFiltered
 			pcl::io::savePCDFileASCII("PCDs/output/outputF_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
-			cout_messages("SavingInPCD done");
+			cout_messages("SavingOutFPCD done");
 #endif
 			//show result
 #ifdef debugPCD
