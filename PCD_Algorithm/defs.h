@@ -48,12 +48,13 @@ typedef unsigned long long pop_t;
 #endif
 #ifdef addAlign
 	#define ICP_IterNum 10
-	//#define SAP_saveOriginal
+	#define SAP_saveOriginal
 	//#define downsampleRES
 	#define smoothingRES
-
-#if (defined smoothingRES || defined downsampleRES)
 	#define SAP_saveFiltered
+
+#if (!(defined smoothingRES) && !(defined downsampleRES))
+#undef SAP_saveFiltered
 #endif
 #ifdef downsampleRES //not working
 	#define downsampleRate_RES 2
@@ -69,7 +70,7 @@ typedef unsigned long long pop_t;
 
 //DEBUG OPTIONS------------
 
-//#define showStatus
+#define showStatus
 //#define debugPCD
 
 //debug followups 
