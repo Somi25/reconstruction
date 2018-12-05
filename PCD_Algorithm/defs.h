@@ -1,68 +1,76 @@
 #pragma once
 
 //BUG ELIMINATION----------
+
 typedef unsigned long long pop_t;
 #define BOOST_TYPEOF_EMULATION
 #define _CRT_SECURE_NO_WARNINGS
 //-------------------------
 
+//INCLUDES-----------------
+
 #include "External.hpp"
 #include "Intrinsic.hpp"
 #include "Distortion.hpp"
+//-------------------------
 
 //FUNCTION OPTIONS---------
-#define addFilters
-#define addAlign
-#define removeNAN
-//#define smoothingSRC
-//#define downsampleSRC
-//#define smoothingRES
-//#define downsampleRES
+
 //#define resizeSRC
+#define addFilters
+//#define saveInputPCD
+#define removeNAN
+//#define downsampleSRC
+//#define smoothingSRC
+#define addAlign
 //#define addMeasurement
-#define saveInputPCD
-#define saveAlignedPCD
 
 //functions followups
+#if 1
 #ifdef addFilters
 	//#define useHoleFill
 	//#define useMedian
 	//#define useGaussian	
 	//#define useCrop
+
+#ifdef useMedian
+#define medianKERNEL 5
+#endif
+#ifdef useHoleFill
+#define holeFillKERNEL 5
+#endif
 #endif
 #ifdef downsampleSRC //not working
-	#define downsampleRate_SRC 2
+#define downsampleRate_SRC 2
+#endif
+#ifdef smoothingSRC
+#define searchRAD_SRC 0.03 //works with 0.05
+#endif
+#ifdef addAlign
+	#define ICP_IterNum 10
+	//#define SAP_saveOriginal
+	//#define downsampleRES
+	#define smoothingRES
+
+#if (defined smoothingRES || defined downsampleRES)
+	#define SAP_saveFiltered
 #endif
 #ifdef downsampleRES //not working
 	#define downsampleRate_RES 2
 #endif
-#ifdef smoothingSRC
-	#define searchRAD_SRC 0.03 //works with 0.05
-#endif
 #ifdef smoothingRES
 	#define searchRAD_RES 0.04 
 #endif
-#ifdef useMedian
-	#define medianKERNEL 5
 #endif
-#ifdef useHoleFill
-	#define holeFillKERNEL 5
-#endif
-#ifdef addAlign
-	#define ICP_IterNum 10
-#endif
-#ifdef saveAlignedPCD //SAP
-	#define SAP_saveOriginal
-	#if (defined smoothingRES || defined downsampleRES)
-		#define SAP_saveFiltered
-	#endif
+
 #endif
 //-------------------------
 
 
 //DEBUG OPTIONS------------
+
 //#define showStatus
-#define debugPCD
+//#define debugPCD
 
 //debug followups 
 #ifdef debugPCD
@@ -80,13 +88,15 @@ typedef unsigned long long pop_t;
 
 
 //IMAGE PATHS--------------
+
 //#define Tanszekiervin
 //#define Enexport
 //#define Ervinexport
 //#define Zinemath
 #define TanszekMunkaasztal1
 
-
+//image paths followups
+#if 1
 #if !(defined(Tanszekiervin) | defined(Ervinexport) | defined(Enexport) | defined(Zinemath) | defined(TanszekMunkaasztal1))
 #error You have to define one input path
 #endif
@@ -122,9 +132,11 @@ typedef unsigned long long pop_t;
 #endif
 #endif
 #endif
+#endif
 //-------------------------
 
 //TYPEDEFS-----------------
+
 typedef pcl::PointXYZ PCDPoint;
 typedef pcl::PointCloud<PCDPoint> PCD;		//simple
 typedef PCD::Ptr PCDPtr;

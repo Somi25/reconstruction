@@ -600,6 +600,7 @@ inline void smoothingPCD(PCDPtr in,float rad)
 	pcl::copyPointCloud(mls_points, *in);
 }
 
+#ifdef addAlign
 // Define a new point representation for < x, y, z, curvature >
 class MyPointRepresentation : public pcl::PointRepresentation <PCDnPoint>
 {
@@ -680,7 +681,7 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 
 	final_transform = targetToSource;
 }
-
+#endif addAlign
 //main--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 int main()
@@ -734,11 +735,12 @@ int main()
 		cout_messages("filtering done");
 #endif
 		//Bring up the last PCD
+#ifdef addAlign
 		if (loader_iter - ITERATOR_MIN > 0)
 		{
 			pcdBefore = pcdThis;
 		}
-
+#endif
 		//Making new PCD
 		pcdThis = DepthToPCD(depth_image, 100.0);
 		if (pcdThis == NULL)
@@ -758,16 +760,12 @@ int main()
 		cout_messages("removeNaN done");
 #endif
 #ifdef downsampleSRC
-		downsamplePCD(pcdThis, downsampleRate);
+		downsamplePCD(pcdThis, downsampleRate_SRC);
 		cout_messages("downsamplePCD done");
 #endif
 #ifdef smoothingSRC
 		smoothingPCD(pcdThis, searchRAD_SRC);
 		cout_messages("smoothingPCD done");
-#endif
-#ifdef downsampleSRC
-		downsamplePCD(pcdThis, downsampleRate_SRC);
-		cout_messages("downsamplePCD done");
 #endif
 		//Align PCD
 #ifdef addAlign
