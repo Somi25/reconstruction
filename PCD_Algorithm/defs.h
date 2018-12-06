@@ -16,6 +16,7 @@ typedef unsigned long long pop_t;
 
 //FUNCTION OPTIONS---------
 
+#define TESTING_ON
 //#define resizeSRC
 #define addFilters
 //#define saveInputPCD
@@ -40,8 +41,8 @@ typedef unsigned long long pop_t;
 #define holeFillKERNEL 5
 #endif
 #endif
-#ifdef downsampleSRC //not working
-#define downsampleRate_SRC 2
+#ifdef downsampleSRC
+#define downsampleRate_SRC 0.1
 #endif
 #ifdef smoothingSRC
 #define searchRAD_SRC 0.03 //works with 0.05
@@ -49,15 +50,15 @@ typedef unsigned long long pop_t;
 #ifdef addAlign
 	#define ICP_IterNum 10
 	#define SAP_saveOriginal
-	//#define downsampleRES
+	#define downsampleRES
 	#define smoothingRES
 	#define SAP_saveFiltered
 
 #if (!(defined smoothingRES) && !(defined downsampleRES))
 #undef SAP_saveFiltered
 #endif
-#ifdef downsampleRES //not working
-	#define downsampleRate_RES 2
+#ifdef downsampleRES
+	#define downsampleRate_RES 0.1
 #endif
 #ifdef smoothingRES
 	#define searchRAD_RES 0.04 
@@ -71,11 +72,11 @@ typedef unsigned long long pop_t;
 //DEBUG OPTIONS------------
 
 #define showStatus
-//#define debugPCD
+#define debugPCD
 
 //debug followups 
 #ifdef debugPCD
-#define shownWindowsNum 1	//to change
+#define shownWindowsNum 2	//to change
 //--------
 #if shownWindowsNum < 1
 	#undef debugPCD

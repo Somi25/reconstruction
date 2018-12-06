@@ -442,10 +442,9 @@ void saturation(cv::Mat& in, float alpha)
 	}
 }
 
-void downsamplePCD(PCDPtr pcdIO,float size = 0.05)
+void downsamplePCD(PCDPtr& pcdIO, float size)
 {
 	PCDPtr pcd(new PCD);
-	Eigen::Vector3i min;
 	pcl::VoxelGrid<pcl::PointXYZ> grid;
 	grid.setInputCloud(pcdIO);
 	grid.setLeafSize(size, size, size);
@@ -455,6 +454,7 @@ void downsamplePCD(PCDPtr pcdIO,float size = 0.05)
 
 void filterDepth(cv::Mat& depth_image)
 {
+#ifdef addFilters
 	cv::Mat temp;
 #ifdef useHoleFill
 	HoleFill(depth_image);
@@ -466,6 +466,7 @@ void filterDepth(cv::Mat& depth_image)
 #ifdef useGaussian
 	cv::GaussianBlur(depth_image, temp, cv::Size(5, 5), 1.8);
 	depth_image = temp;
+#endif
 #endif
 }
 
@@ -577,7 +578,7 @@ inline int loadImages(cv::Mat& depth, cv::Mat& rgb, std::string& path, std::stri
 	return 1;
 }
 
-inline void smoothingPCD(PCDPtr in,float rad)
+inline void smoothingPCD(PCDPtr in,float radius)
 {
 	pcl::search::KdTree<PCDPoint>::Ptr tree(new pcl::search::KdTree<PCDPoint>);
 
@@ -593,7 +594,7 @@ inline void smoothingPCD(PCDPtr in,float rad)
 	mls.setInputCloud(in);
 	mls.setPolynomialFit(true);
 	mls.setSearchMethod(tree);
-	mls.setSearchRadius(rad);
+	mls.setSearchRadius(radius);
 
 	// Reconstruct
 	mls.process(mls_points);
@@ -622,9 +623,10 @@ public:
 		out[3] = p.curvature;
 	}
 };
-
+#endif
 inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eigen::Matrix4f &final_transform)
 {
+#ifdef addAlign
 	// Compute surface normals and curvature
 	PCDnPtr points_with_normals_src(new PCDn);
 	PCDnPtr points_with_normals_tgt(new PCDn);
@@ -680,9 +682,10 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 	*output += *cloud_src;
 
 	final_transform = targetToSource;
-}
 #endif addAlign
-//main--------------------------------------------------------------------------------------------------------------------------------------------------------
+}
+//main------------------------------------------------------------------------------------------------------------------------------------
+#if (!defined TESTING_ON)
 
 int main()
 {
@@ -694,6 +697,7 @@ int main()
 	PCDPtr pcdBefore(new PCD());
 	PCDPtr finalResult(new PCD());
 
+	string message;
 	//Open visualizing threads
 #ifdef debugPCD
 #if shownWindowsNum > 0
@@ -730,17 +734,15 @@ int main()
 		cout_messages("preparingDepth done");
 
 		//Filtering
-#ifdef addFilters
 		filterDepth(depth_image);
 		cout_messages("filtering done");
-#endif
+
 		//Bring up the last PCD
-#ifdef addAlign
 		if (loader_iter - ITERATOR_MIN > 0)
 		{
 			pcdBefore = pcdThis;
 		}
-#endif
+
 		//Making new PCD
 		pcdThis = DepthToPCD(depth_image, 100.0);
 		if (pcdThis == NULL)
@@ -749,6 +751,7 @@ int main()
 			return -1;
 		}
 		cout_messages("DepthToPCD done");
+
 #ifdef saveInputPCD
 		pcl::io::savePCDFileASCII("PCDs/input/inputPCD_" + std::to_string(loader_iter-ITERATOR_MIN) + ".pcd", *pcdThis);
 		cout_messages("SavingInPCD done");
@@ -759,14 +762,17 @@ int main()
 		pcl::removeNaNFromPointCloud(*pcdThis, *pcdThis, indices);
 		cout_messages("removeNaN done");
 #endif
+
 #ifdef downsampleSRC
 		downsamplePCD(pcdThis, downsampleRate_SRC);
 		cout_messages("downsamplePCD done");
 #endif
+
 #ifdef smoothingSRC
 		smoothingPCD(pcdThis, searchRAD_SRC);
 		cout_messages("smoothingPCD done");
 #endif
+
 		//Align PCD
 #ifdef addAlign
 		if ((loader_iter - ITERATOR_MIN) > 0)
@@ -779,15 +785,13 @@ int main()
 			cout_messages("alignPCD done");
 			//transform current pair into the global transform
 			pcl::transformPointCloud(*temp, *result, GlobalTransform);
-			string message = "result size: \t" + std::to_string(result->size());
-			cout_messages(message);
+			cout_messages("result size: \t" + std::to_string(result->size()));
 			//update the global transform
 			GlobalTransform = GlobalTransform * pairTransform;
 			//Visualize align result
 			*finalResult += *result;
 			cout_messages("finalResult done");
-			message = "finalResult_Orig size: " + std::to_string(finalResult->size());
-			cout_messages(message);
+			cout_messages("finalResult_Orig size: " + std::to_string(finalResult->size()));
 #ifdef SAP_saveOriginal
 			pcl::io::savePCDFileASCII("PCDs/output/outputN_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
 			cout_messages("SavingOutNPCD done");
@@ -795,12 +799,12 @@ int main()
 #ifdef downsampleRES
 			downsamplePCD(finalResult, downsampleRate_RES);
 			cout_messages("downsamplePCD done");
+			cout_messages("finalResult_Down size: " + std::to_string(finalResult->size()));
 #endif
 #ifdef smoothingRES
 			smoothingPCD(finalResult, searchRAD_RES);
 			cout_messages("smoothingPCD done");
-			message = "finalResult_Filt size: " + std::to_string(finalResult->size());
-			cout_messages(message);
+			cout_messages("finalResult_Filt size: " + std::to_string(finalResult->size()));
 #endif
 #ifdef SAP_saveFiltered
 			pcl::io::savePCDFileASCII("PCDs/output/outputF_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
@@ -862,7 +866,34 @@ int main()
 
 	return 0;
 }
+#else
+int main() 
+{
+	PCDPtr testSubject(new PCD), testOutput(new PCD);
+	int iterator = 1;
+	while(1)
+	{
+		string a;
+		cout << "Test" << iterator << endl;
+		pcl::io::loadPCDFile("PCDs/output/outputN_PCD_" + std::to_string(iterator) + ".pcd", *testSubject);
+		if (testSubject == NULL)
+		{
+			cout << "Test" << iterator << "failed" << endl<< "Write stg nice"<<endl;
+			cin >> a;
+			return 0;
+		}
+		cout << "Before test:"<<endl;
 
+		cout << "PCDPtr size:" << testSubject->size() << endl;
+		downsamplePCD(testSubject,0.1);
+		cout << "After test:" << endl;
+
+		cout << "PCDPtr size:" << testSubject->size() << endl;
+		iterator++;
+	}
+	return 0;
+}
+#endif
 
 //Functions from former projects----------------------------------------------------------------------------------------------------------
 
