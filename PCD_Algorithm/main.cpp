@@ -176,9 +176,11 @@ void visualizeF()
 
 void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, bool autoColor, uint8_t R = 255, uint8_t G = 255, uint8_t B = 255)
 {
+	outPtr->clear();
 	outPtr->resize(inPcd->size());
 	if (autoColor)
 	{
+#pragma omp parallel for
 		for (size_t i = 0; i < inPcd->size(); ++i)
 		{
 			PCDc::PointType p;
@@ -190,6 +192,7 @@ void PCDColorize(PCDPtr inPcd, PCDcPtr outPtr, bool autoColor, uint8_t R = 255, 
 	}
 	else
 	{
+#pragma omp parallel for
 		for (size_t i = 0; i < inPcd->size(); ++i)
 		{
 			PCDc::PointType p;
@@ -289,11 +292,10 @@ void type_debug(cv::Mat in);
 void saturation(cv::Mat& in, float alpha);
 int hist_max(cv::Mat in);
 void hist_debug(cv::Mat in, bool interestInHoleFill);
-#ifdef useHoleFill
-void HoleFill(cv::Mat& image, int iterations = 1);
 
-void HoleFill(cv::Mat& image, int iterations)
+void HoleFill(cv::Mat& image, int iterations=1)
 {
+#ifdef useHoleFill
 	if (image.type() != CV_32FC1)
 	{
 		cout_messages("Only CV_32FC1 is supported");
@@ -424,8 +426,9 @@ void HoleFill(cv::Mat& image, int iterations)
 			}
 		}
 	}
-}
 #endif
+}
+
 void saturation(cv::Mat& in, float alpha)
 {
 	if (in.type() != CV_32FC1)
@@ -654,10 +657,10 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 
 	// Align
 	pcl::IterativeClosestPointNonLinear<PCDnPoint, PCDnPoint> reg;
-	reg.setTransformationEpsilon(1e-6);
+	reg.setTransformationEpsilon(ICP_Precision);
 	// Set the maximum distance between two correspondences (src<->tgt) to 10cm
 	// Note: adjust this based on the size of your datasets
-	reg.setMaxCorrespondenceDistance(0.1);
+	reg.setMaxCorrespondenceDistance(5);
 	// Set the point representation
 	reg.setPointRepresentation(boost::make_shared<const MyPointRepresentation>(point_representation));
 
@@ -771,10 +774,8 @@ int main()
 #ifdef smoothingSRC
 		smoothingPCD(pcdThis, searchRAD_SRC);
 		cout_messages("smoothingPCD done");
-#ifdef debugPCD
-		showPCD(pcdThis, 2);
 #endif
-#endif
+
 #ifdef SIP_saveFiltered
 		pcl::io::savePCDFileASCII("PCDs/input/inputF_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *pcdThis);
 		cout_messages("SavingInFPCD done");
@@ -792,39 +793,41 @@ int main()
 			cout_messages("alignPCD done");
 			//transform current pair into the global transform
 			pcl::transformPointCloud(*temp, *result, GlobalTransform);
+			cout_messages("result done");
 			cout_messages("result size: \t" + std::to_string(result->size()));
+#ifdef SAP_saveResult
+			pcl::io::savePCDFileASCII("PCDs/output/outputRes_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *result);
+			cout_messages("SavingOutFPCD done");
+#endif
 			//update the global transform
 			GlobalTransform = GlobalTransform * pairTransform;
 			//Visualize align result
 			*finalResult += *result;
 			cout_messages("finalResult done");
-			showPCD(result, 3);
-			showPCD(finalResult, 4);
 			cout_messages("finalResult_Orig size: " + std::to_string(finalResult->size()));
 #ifdef SAP_saveOriginal
 			pcl::io::savePCDFileASCII("PCDs/output/outputN_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
 			cout_messages("SavingOutNPCD done");
 #endif
+
 #ifdef downsampleRES
 			downsamplePCD(finalResult, downsampleRate_RES);
 			cout_messages("downsamplePCD done");
-			showPCD(finalResult, 5);
 			cout_messages("finalResult_Down size: " + std::to_string(finalResult->size()));
 #endif
+
 #ifdef smoothingRES
 			smoothingPCD(finalResult, searchRAD_RES);
 			cout_messages("smoothingPCD done");
-			showPCD(finalResult, 6);
 			cout_messages("finalResult_Filt size: " + std::to_string(finalResult->size()));
 #endif
+
 #ifdef SAP_saveFiltered
 			pcl::io::savePCDFileASCII("PCDs/output/outputF_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
 			cout_messages("SavingOutFPCD done");
 #endif
-			//show result
-#ifdef debugPCD
 			showPCD(finalResult, 1);
-#endif
+			//show result
 		}
 #endif
 		//Show some pcds
@@ -894,7 +897,8 @@ int main()
 	{
 		string a;
 		cout << "Test" << iterator << endl;
-		pcl::io::loadPCDFile("PCDs/input/inputPCD_" + std::to_string(iterator) + ".pcd", *testSubject);
+		testSubject->clear();
+		pcl::io::loadPCDFile("PCDs/input/inputN_PCD_" + std::to_string(iterator) + ".pcd", *testSubject);
 		if (testSubject == NULL)
 		{
 			cout << "Test" << iterator << "failed" << endl<< "Write stg nice"<<endl;
@@ -906,7 +910,7 @@ int main()
 
 		cout << "PCDPtr size:" << testSubject->size() << endl;
 		showPCD(testSubject, 1);
-		smoothingPCD(testSubject, searchRAD_RES);
+		smoothingPCD(testSubject, searchRAD_SRC);
 		showPCD(testSubject, 2);
 		cout << "After test:" << endl;
 
