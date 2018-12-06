@@ -211,7 +211,9 @@ void showPCD(PCDPtr inPcd, int viewerNum) // viewer num is from 1 - shownWindows
 {
 	if (viewerNum > shownWindowsNum || viewerNum < 1)
 	{
-		cout_message(" viewerNum is not valid in showPCD");
+#ifdef showStatus
+		cout_message("ViewerNum is not valid in showPCD");	//cant find cout message from here in release build
+#endif
 		return;
 	}
 
@@ -764,9 +766,6 @@ int main()
 #ifdef downsampleSRC
 		downsamplePCD(pcdThis, downsampleRate_SRC);
 		cout_messages("downsamplePCD done");
-#ifdef debugPCD
-		showPCD(pcdThis, 1);
-#endif
 #endif
 
 #ifdef smoothingSRC

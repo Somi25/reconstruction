@@ -19,11 +19,11 @@ typedef unsigned long long pop_t;
 //#define TESTING_ON
 //#define resizeSRC
 #define addFilters
-#define SIP_saveOriginal
+//#define SIP_saveOriginal
 #define removeNAN
 #define downsampleSRC
 //#define smoothingSRC
-#define SIP_saveFiltered
+//#define SIP_saveFiltered
 //#define addAlign
 //#define addMeasurement
 
@@ -43,7 +43,7 @@ typedef unsigned long long pop_t;
 #endif
 #endif
 #ifdef downsampleSRC
-#define downsampleRate_SRC 0.05
+#define downsampleRate_SRC 0.06
 #endif
 #ifdef smoothingSRC
 #define searchRAD_SRC 0.03
@@ -72,12 +72,12 @@ typedef unsigned long long pop_t;
 
 //DEBUG OPTIONS------------
 
-#define showStatus
-//#define debugPCD
+//#define showStatus
+#define debugPCD
 
 //debug followups 
 #ifdef debugPCD
-#define shownWindowsNum 2	//to change
+#define shownWindowsNum 1	//to change
 //--------
 #if shownWindowsNum < 1
 	#undef debugPCD
