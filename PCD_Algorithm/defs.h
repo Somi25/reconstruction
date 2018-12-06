@@ -16,14 +16,15 @@ typedef unsigned long long pop_t;
 
 //FUNCTION OPTIONS---------
 
-#define TESTING_ON
+//#define TESTING_ON
 //#define resizeSRC
 #define addFilters
-//#define saveInputPCD
+#define SIP_saveOriginal
 #define removeNAN
-//#define downsampleSRC
+#define downsampleSRC
 //#define smoothingSRC
-#define addAlign
+#define SIP_saveFiltered
+//#define addAlign
 //#define addMeasurement
 
 //functions followups
@@ -42,17 +43,17 @@ typedef unsigned long long pop_t;
 #endif
 #endif
 #ifdef downsampleSRC
-#define downsampleRate_SRC 0.1
+#define downsampleRate_SRC 0.05
 #endif
 #ifdef smoothingSRC
-#define searchRAD_SRC 0.03 //works with 0.05
+#define searchRAD_SRC 0.03
 #endif
 #ifdef addAlign
 	#define ICP_IterNum 10
-	#define SAP_saveOriginal
+	//#define SAP_saveOriginal
 	#define downsampleRES
 	#define smoothingRES
-	#define SAP_saveFiltered
+	//#define SAP_saveFiltered
 
 #if (!(defined smoothingRES) && !(defined downsampleRES))
 #undef SAP_saveFiltered
@@ -61,7 +62,7 @@ typedef unsigned long long pop_t;
 	#define downsampleRate_RES 0.1
 #endif
 #ifdef smoothingRES
-	#define searchRAD_RES 0.04 
+	#define searchRAD_RES 0.1
 #endif
 #endif
 
@@ -72,7 +73,7 @@ typedef unsigned long long pop_t;
 //DEBUG OPTIONS------------
 
 #define showStatus
-#define debugPCD
+//#define debugPCD
 
 //debug followups 
 #ifdef debugPCD

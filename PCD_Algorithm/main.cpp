@@ -211,9 +211,7 @@ void showPCD(PCDPtr inPcd, int viewerNum) // viewer num is from 1 - shownWindows
 {
 	if (viewerNum > shownWindowsNum || viewerNum < 1)
 	{
-#ifdef showStatus
-		cout << " viewerNum is not valid in showPCD" << endl;
-#endif
+		cout_message(" viewerNum is not valid in showPCD");
 		return;
 	}
 
@@ -752,9 +750,9 @@ int main()
 		}
 		cout_messages("DepthToPCD done");
 
-#ifdef saveInputPCD
-		pcl::io::savePCDFileASCII("PCDs/input/inputPCD_" + std::to_string(loader_iter-ITERATOR_MIN) + ".pcd", *pcdThis);
-		cout_messages("SavingInPCD done");
+#ifdef SIP_saveOriginal
+		pcl::io::savePCDFileASCII("PCDs/input/inputN_PCD_" + std::to_string(loader_iter-ITERATOR_MIN) + ".pcd", *pcdThis);
+		cout_messages("SavingInNPCD done");
 #endif
 
 #ifdef removeNAN
@@ -766,11 +764,21 @@ int main()
 #ifdef downsampleSRC
 		downsamplePCD(pcdThis, downsampleRate_SRC);
 		cout_messages("downsamplePCD done");
+#ifdef debugPCD
+		showPCD(pcdThis, 1);
+#endif
 #endif
 
 #ifdef smoothingSRC
 		smoothingPCD(pcdThis, searchRAD_SRC);
 		cout_messages("smoothingPCD done");
+#ifdef debugPCD
+		showPCD(pcdThis, 2);
+#endif
+#endif
+#ifdef SIP_saveFiltered
+		pcl::io::savePCDFileASCII("PCDs/input/inputF_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *pcdThis);
+		cout_messages("SavingInFPCD done");
 #endif
 
 		//Align PCD
@@ -791,6 +799,8 @@ int main()
 			//Visualize align result
 			*finalResult += *result;
 			cout_messages("finalResult done");
+			showPCD(result, 3);
+			showPCD(finalResult, 4);
 			cout_messages("finalResult_Orig size: " + std::to_string(finalResult->size()));
 #ifdef SAP_saveOriginal
 			pcl::io::savePCDFileASCII("PCDs/output/outputN_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
@@ -799,11 +809,13 @@ int main()
 #ifdef downsampleRES
 			downsamplePCD(finalResult, downsampleRate_RES);
 			cout_messages("downsamplePCD done");
+			showPCD(finalResult, 5);
 			cout_messages("finalResult_Down size: " + std::to_string(finalResult->size()));
 #endif
 #ifdef smoothingRES
 			smoothingPCD(finalResult, searchRAD_RES);
 			cout_messages("smoothingPCD done");
+			showPCD(finalResult, 6);
 			cout_messages("finalResult_Filt size: " + std::to_string(finalResult->size()));
 #endif
 #ifdef SAP_saveFiltered
@@ -871,11 +883,19 @@ int main()
 {
 	PCDPtr testSubject(new PCD), testOutput(new PCD);
 	int iterator = 1;
+#ifdef debugPCD
+#if shownWindowsNum > 0
+	boost::thread workerThreadA(visualizeA);
+#endif
+#if shownWindowsNum > 1
+	boost::thread workerThreadB(visualizeB);
+#endif
+#endif
 	while(1)
 	{
 		string a;
 		cout << "Test" << iterator << endl;
-		pcl::io::loadPCDFile("PCDs/output/outputN_PCD_" + std::to_string(iterator) + ".pcd", *testSubject);
+		pcl::io::loadPCDFile("PCDs/input/inputPCD_" + std::to_string(iterator) + ".pcd", *testSubject);
 		if (testSubject == NULL)
 		{
 			cout << "Test" << iterator << "failed" << endl<< "Write stg nice"<<endl;
@@ -883,14 +903,25 @@ int main()
 			return 0;
 		}
 		cout << "Before test:"<<endl;
+		downsamplePCD(testSubject, downsampleRate_SRC);
 
 		cout << "PCDPtr size:" << testSubject->size() << endl;
-		downsamplePCD(testSubject,0.1);
+		showPCD(testSubject, 1);
+		smoothingPCD(testSubject, searchRAD_RES);
+		showPCD(testSubject, 2);
 		cout << "After test:" << endl;
 
 		cout << "PCDPtr size:" << testSubject->size() << endl;
 		iterator++;
 	}
+#ifdef debugPCD
+#if shownWindowsNum > 0
+	workerThreadA.join();
+#endif
+#if shownWindowsNum > 1
+	workerThreadB.join();
+#endif
+#endif
 	return 0;
 }
 #endif
