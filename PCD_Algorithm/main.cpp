@@ -214,9 +214,7 @@ void showPCD(PCDPtr inPcd, int viewerNum) // viewer num is from 1 - shownWindows
 {
 	if (viewerNum > shownWindowsNum || viewerNum < 1)
 	{
-#ifdef showStatus
-		cout_message("ViewerNum is not valid in showPCD");	//cant find cout message from here in release build
-#endif
+		cout_messages("ViewerNum is not valid in showPCD");	
 		return;
 	}
 
@@ -604,6 +602,19 @@ inline void smoothingPCD(PCDPtr in,float radius)
 	pcl::copyPointCloud(mls_points, *in);
 }
 
+inline void statisticalOutlierRemovalPCD(PCDPtr& cloud,int kmean)
+{
+#ifdef outlierRemovalSRC
+	PCDPtr cloud_filtered(new PCD);
+	pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+	sor.setInputCloud(cloud);
+	sor.setMeanK(kmean);
+	sor.setStddevMulThresh(1.0);
+	sor.filter(*cloud_filtered);
+	cloud = cloud_filtered;
+#endif
+}
+
 #ifdef addAlign
 // Define a new point representation for < x, y, z, curvature >
 class MyPointRepresentation : public pcl::PointRepresentation <PCDnPoint>
@@ -725,6 +736,13 @@ int main()
 
 	while (loader_iter < ITERATOR_MAX)
 	{
+#ifdef addMeasurement
+		double freq = cvGetTickFrequency();
+		int64 e1;
+		int64 e2;
+		double time;
+		e1 = cvGetTickCount();
+#endif
 		cv::Mat depth_image, rgb_img;
 		//Load
 		if (!loadImages(depth_image, rgb_img, workpath, depth_name, amplitude_name, loader_iter))
@@ -766,6 +784,12 @@ int main()
 		cout_messages("removeNaN done");
 #endif
 
+#ifdef outlierRemovalSRC
+		statisticalOutlierRemovalPCD(pcdThis,25);
+		statisticalOutlierRemovalPCD(pcdThis,40);
+		cout_messages("OutlierRemoval done");
+#endif
+
 #ifdef downsampleSRC
 		downsamplePCD(pcdThis, downsampleRate_SRC);
 		cout_messages("downsamplePCD done");
@@ -794,7 +818,6 @@ int main()
 			//transform current pair into the global transform
 			pcl::transformPointCloud(*temp, *result, GlobalTransform);
 			cout_messages("result done");
-			cout_messages("result size: \t" + std::to_string(result->size()));
 #ifdef SAP_saveResult
 			pcl::io::savePCDFileASCII("PCDs/output/outputRes_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *result);
 			cout_messages("SavingOutFPCD done");
@@ -804,7 +827,6 @@ int main()
 			//Visualize align result
 			*finalResult += *result;
 			cout_messages("finalResult done");
-			cout_messages("finalResult_Orig size: " + std::to_string(finalResult->size()));
 #ifdef SAP_saveOriginal
 			pcl::io::savePCDFileASCII("PCDs/output/outputN_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
 			cout_messages("SavingOutNPCD done");
@@ -813,21 +835,22 @@ int main()
 #ifdef downsampleRES
 			downsamplePCD(finalResult, downsampleRate_RES);
 			cout_messages("downsamplePCD done");
-			cout_messages("finalResult_Down size: " + std::to_string(finalResult->size()));
 #endif
 
 #ifdef smoothingRES
 			smoothingPCD(finalResult, searchRAD_RES);
 			cout_messages("smoothingPCD done");
-			cout_messages("finalResult_Filt size: " + std::to_string(finalResult->size()));
 #endif
 
 #ifdef SAP_saveFiltered
 			pcl::io::savePCDFileASCII("PCDs/output/outputF_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
 			cout_messages("SavingOutFPCD done");
 #endif
-			showPCD(finalResult, 1);
+
 			//show result
+#ifdef debugPCD
+			showPCD(finalResult, 1);
+#endif
 		}
 #endif
 		//Show some pcds
@@ -836,17 +859,18 @@ int main()
 #endif
 
 			//-------------kibaszott meres ------------------------//
-#ifdef addMeasurement
-		double freq = cvGetTickFrequency();
-		int64 e1;
-		int64 e2;
-		double time;
-		e1 = cvGetTickCount();
-
+//#ifdef addMeasurement
+//		double freq = cvGetTickFrequency();
+//		int64 e1;
+//		int64 e2;
+//		double time;
+//		e1 = cvGetTickCount();
+//#endif
 
 		//Insert algorithm here!
 
 
+#ifdef addMeasurement
 		e2 = cvGetTickCount();
 		time = (e2 - e1) / freq;
 		cout << time << " sec volt a futasi ido" << endl;

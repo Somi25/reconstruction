@@ -21,8 +21,9 @@ typedef unsigned long long pop_t;
 #define addFilters
 //#define SIP_saveOriginal
 #define removeNAN
-#define downsampleSRC
-#define smoothingSRC
+#define outlierRemovalSRC
+//#define downsampleSRC
+//#define smoothingSRC
 //#define SIP_saveFiltered
 #define addAlign
 //#define addMeasurement
@@ -85,7 +86,7 @@ typedef unsigned long long pop_t;
 
 //DEBUG OPTIONS------------
 
-//#define showStatus
+#define showStatus
 #define debugPCD
 
 //debug followups 
