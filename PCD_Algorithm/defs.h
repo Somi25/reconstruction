@@ -26,7 +26,7 @@ typedef unsigned long long pop_t;
 //#define smoothingSRC
 //#define SIP_saveFiltered
 #define addAlign
-//#define addMeasurement
+#define addMeasurement
 
 //functions followups
 #if 1
@@ -47,14 +47,15 @@ typedef unsigned long long pop_t;
 #define downsampleRate_SRC 0.06
 #endif
 #ifdef smoothingSRC
-#define searchRAD_SRC 0.5
+#define searchRAD_SRC 0.04
 #endif
 #ifdef addAlign
-	#define ICP_IterNum 50
+	#define ICP_IterNum 60
 	#define ICP_Precision 1e-8
 	//#define SAP_saveResult //result of matching the 2 pcds
 	//#define SAP_saveOriginal
 	#define downsampleRES
+	//#define outlierRemovalRES
 	//#define smoothingRES
 	//#define SAP_saveFiltered
 
@@ -62,7 +63,7 @@ typedef unsigned long long pop_t;
 #undef SAP_saveFiltered
 #endif
 #ifdef downsampleRES
-	#define downsampleRate_RES 0.1
+	#define downsampleRate_RES 0.03
 #endif
 #ifdef smoothingRES
 	#define searchRAD_RES 0.5
@@ -74,8 +75,8 @@ typedef unsigned long long pop_t;
 #undef addFilters
 #undef SIP_saveOriginal
 #undef removeNAN
-//#undef downsampleSRC
-//#undef smoothingSRC
+#undef downsampleSRC
+#undef smoothingSRC
 #undef SIP_saveFiltered
 #undef addAlign
 #undef addMeasurement
@@ -91,7 +92,7 @@ typedef unsigned long long pop_t;
 
 //debug followups 
 #ifdef debugPCD
-#define shownWindowsNum 1	//to change
+#define shownWindowsNum 2	//to change
 //--------
 #if shownWindowsNum < 1
 	#undef debugPCD

@@ -602,14 +602,14 @@ inline void smoothingPCD(PCDPtr in,float radius)
 	pcl::copyPointCloud(mls_points, *in);
 }
 
-inline void statisticalOutlierRemovalPCD(PCDPtr& cloud,int kmean)
+inline void statisticalOutlierRemovalPCD(PCDPtr& cloud,int kmean, int sDev)
 {
-#ifdef outlierRemovalSRC
+#if (defined outlierRemovalSRC || defined outlierRemovalRES)
 	PCDPtr cloud_filtered(new PCD);
 	pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
 	sor.setInputCloud(cloud);
 	sor.setMeanK(kmean);
-	sor.setStddevMulThresh(1.0);
+	sor.setStddevMulThresh(sDev);
 	sor.filter(*cloud_filtered);
 	cloud = cloud_filtered;
 #endif
@@ -785,8 +785,7 @@ int main()
 #endif
 
 #ifdef outlierRemovalSRC
-		statisticalOutlierRemovalPCD(pcdThis,25);
-		statisticalOutlierRemovalPCD(pcdThis,40);
+		statisticalOutlierRemovalPCD(pcdThis,30,1.0);
 		cout_messages("OutlierRemoval done");
 #endif
 
@@ -798,6 +797,7 @@ int main()
 #ifdef smoothingSRC
 		smoothingPCD(pcdThis, searchRAD_SRC);
 		cout_messages("smoothingPCD done");
+		showPCD(pcdThis, 1);
 #endif
 
 #ifdef SIP_saveFiltered
@@ -822,11 +822,15 @@ int main()
 			pcl::io::savePCDFileASCII("PCDs/output/outputRes_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *result);
 			cout_messages("SavingOutFPCD done");
 #endif
+#ifdef outlierRemovalRES
+			statisticalOutlierRemovalPCD(result, 20, 1);
+#endif
 			//update the global transform
 			GlobalTransform = GlobalTransform * pairTransform;
 			//Visualize align result
 			*finalResult += *result;
 			cout_messages("finalResult done");
+
 #ifdef SAP_saveOriginal
 			pcl::io::savePCDFileASCII("PCDs/output/outputN_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
 			cout_messages("SavingOutNPCD done");
@@ -836,6 +840,7 @@ int main()
 			downsamplePCD(finalResult, downsampleRate_RES);
 			cout_messages("downsamplePCD done");
 #endif
+
 
 #ifdef smoothingRES
 			smoothingPCD(finalResult, searchRAD_RES);
@@ -849,7 +854,8 @@ int main()
 
 			//show result
 #ifdef debugPCD
-			showPCD(finalResult, 1);
+			//showPCD(result, 1);
+			showPCD(finalResult, 2);
 #endif
 		}
 #endif
@@ -872,7 +878,7 @@ int main()
 
 #ifdef addMeasurement
 		e2 = cvGetTickCount();
-		time = (e2 - e1) / freq;
+		time = (e2 - e1) / (freq*1000000);
 		cout << time << " sec volt a futasi ido" << endl;
 #endif
 
@@ -916,25 +922,25 @@ int main()
 #if shownWindowsNum > 1
 	boost::thread workerThreadB(visualizeB);
 #endif
+#if shownWindowsNum > 2
+	boost::thread workerThreadC(visualizeC);
+#endif
 #endif
 	while(1)
 	{
 		string a;
 		cout << "Test" << iterator << endl;
-		testSubject->clear();
-		pcl::io::loadPCDFile("PCDs/input/inputN_PCD_" + std::to_string(iterator) + ".pcd", *testSubject);
-		if (testSubject == NULL)
+		pcl::io::loadPCDFile("PCDs/output/outputRes_PCD_" + std::to_string(iterator) + ".pcd", *testSubject);
+		if (testSubject->size() == 0)
 		{
 			cout << "Test" << iterator << "failed" << endl<< "Write stg nice"<<endl;
 			cin >> a;
 			return 0;
 		}
 		cout << "Before test:"<<endl;
-		downsamplePCD(testSubject, downsampleRate_SRC);
-
-		cout << "PCDPtr size:" << testSubject->size() << endl;
 		showPCD(testSubject, 1);
-		smoothingPCD(testSubject, searchRAD_SRC);
+ 		*testOutput = *testSubject;
+		statisticalOutlierRemovalPCD(testSubject, 30, 1.0);
 		showPCD(testSubject, 2);
 		cout << "After test:" << endl;
 
@@ -947,6 +953,9 @@ int main()
 #endif
 #if shownWindowsNum > 1
 	workerThreadB.join();
+#endif
+#if shownWindowsNum > 2
+	workerThreadC.join();
 #endif
 #endif
 	return 0;
