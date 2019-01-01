@@ -300,7 +300,7 @@ void HoleFill(cv::Mat& image, int iterations=1)
 		return;
 	}
 	int kernelSize = holeFillKERNEL; //3,5,7..
-	double threshold = 1.0;
+	double threshold = 0.5;
 
 	iterations = std::max(iterations, 0);
 
@@ -465,7 +465,7 @@ void filterDepth(cv::Mat& depth_image)
 	depth_image = temp;
 #endif
 #ifdef useGaussian
-	cv::GaussianBlur(depth_image, temp, cv::Size(5, 5), 1.8);
+	cv::GaussianBlur(depth_image, temp, cv::Size(3, 3), 1.6);
 	depth_image = temp;
 #endif
 #endif
@@ -589,7 +589,7 @@ inline void smoothingPCD(PCDPtr in,float radius)
 	// Init object (second point type is for the normals, even if unused)
 	pcl::MovingLeastSquares<PCDPoint, PCDnPoint> mls;
 
-	mls.setComputeNormals(true);
+	mls.setComputeNormals(false);
 
 	// Set parameters
 	mls.setInputCloud(in);
@@ -638,7 +638,7 @@ public:
 	}
 };
 #endif
-inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eigen::Matrix4f &final_transform)
+inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eigen::Matrix4f &final_transform, float precision, float iterCount)
 {
 #ifdef addAlign
 	// Compute surface normals and curvature
@@ -646,7 +646,7 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 	PCDnPtr points_with_normals_tgt(new PCDn);
 
 	//normal estimation
-	pcl::NormalEstimation<PCDPoint, PCDnPoint> norm_est;
+	pcl::NormalEstimationOMP<PCDPoint, PCDnPoint> norm_est;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
 	norm_est.setSearchMethod(tree);
 	norm_est.setKSearch(30);
@@ -668,10 +668,10 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 
 	// Align
 	pcl::IterativeClosestPointNonLinear<PCDnPoint, PCDnPoint> reg;
-	reg.setTransformationEpsilon(ICP_Precision);
+	reg.setTransformationEpsilon(precision);
 	// Set the maximum distance between two correspondences (src<->tgt) to 10cm
 	// Note: adjust this based on the size of your datasets
-	reg.setMaxCorrespondenceDistance(5);
+	reg.setMaxCorrespondenceDistance(1);
 	// Set the point representation
 	reg.setPointRepresentation(boost::make_shared<const MyPointRepresentation>(point_representation));
 
@@ -680,7 +680,7 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 
 	//Optimize
 	Eigen::Matrix4f Ti = Eigen::Matrix4f::Identity(), prev, targetToSource;
-	reg.setMaximumIterations(ICP_IterNum);
+	reg.setMaximumIterations(iterCount);
 
 	reg.align(*points_with_normals_src);
 	//accumulate transformation between each Iteration
@@ -698,9 +698,15 @@ inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr outp
 	final_transform = targetToSource;
 #endif addAlign
 }
+
+inline void alignPCD(const PCDPtr cloud_src, const PCDPtr cloud_tgt, PCDPtr output, Eigen::Matrix4f &final_transform)
+{
+#ifdef addAlign
+	alignPCD(cloud_src, cloud_tgt, output, final_transform, ICP_Precision, ICP_IterNum);
+#endif addAlign
+}
 //main------------------------------------------------------------------------------------------------------------------------------------
 #if (!defined TESTING_ON)
-
 int main()
 {
 	std::string workpath, depth_name, amplitude_name;
@@ -712,6 +718,8 @@ int main()
 	PCDPtr finalResult(new PCD());
 
 	string message;
+	string input_string = "y";
+
 	//Open visualizing threads
 #ifdef debugPCD
 #if shownWindowsNum > 0
@@ -733,7 +741,7 @@ int main()
 	boost::thread workerThreadF(visualizeF);
 #endif
 #endif
-
+	
 	while (loader_iter < ITERATOR_MAX)
 	{
 #ifdef addMeasurement
@@ -752,11 +760,11 @@ int main()
 
 		//Conversion
 		preparingDepth(depth_image);
-		cout_messages("preparingDepth done");
+		cout_messages("-PreparingDepth done");
 
 		//Filtering
 		filterDepth(depth_image);
-		cout_messages("filtering done");
+		cout_messages("-Filtering done");
 
 		//Bring up the last PCD
 		if (loader_iter - ITERATOR_MIN > 0)
@@ -771,24 +779,75 @@ int main()
 			cout_messages("PCD is nullpointer");
 			return -1;
 		}
-		cout_messages("DepthToPCD done");
+		cout_messages("-DepthToPCD done");
 
 #ifdef SIP_saveOriginal
-		pcl::io::savePCDFileASCII("PCDs/input/inputN_PCD_" + std::to_string(loader_iter-ITERATOR_MIN) + ".pcd", *pcdThis);
-		cout_messages("SavingInNPCD done");
+		pcl::io::savePCDFileASCII("PCDs/input_finish/input_N_PCD_" + std::to_string(loader_iter-ITERATOR_MIN) + ".pcd", *pcdThis);
+		cout_messages("SavingIn_NPCD done");
 #endif
-
 #ifdef removeNAN
 		std::vector<int> indices;
 		pcl::removeNaNFromPointCloud(*pcdThis, *pcdThis, indices);
-		cout_messages("removeNaN done");
+		cout_messages("--RemoveNaN done");
 #endif
 
+		PCD tempPCD;
+		PCDPtr tempPCDPtr(new PCD);
+		do
+		{
+			uint32_t j = 0;
+			tempPCD.header = pcdThis->header;
+			tempPCD.points.resize(pcdThis->points.size());
+			if(input_string != "n")
+				for (int i = 0; i < pcdThis->size(); i++)
+				{
+					if (pcdThis->points[i].z > -6.00)
+						continue;
+					tempPCD.points[j] = pcdThis->points[i];
+					j++;
+				}
+			else
+			{
+				float threshold;
+				cout << "set threshold, default is " << -6.00 << endl;
+				cin >> threshold;
+				for (int i = 0; i < pcdThis->size(); i++)
+				{
+					if (pcdThis->points[i].z > threshold)
+						continue;
+					tempPCD.points[j] = pcdThis->points[i];
+					j++;
+				}
+			}
+			tempPCD.points.resize(j);
+			tempPCD.height = 1;
+			tempPCD.width = j;
+			*tempPCDPtr = tempPCD;
+			cout_messages("--threshold done");
 #ifdef outlierRemovalSRC
-		statisticalOutlierRemovalPCD(pcdThis,30,1.0);
-		cout_messages("OutlierRemoval done");
+			if (input_string != "n")
+				statisticalOutlierRemovalPCD(tempPCDPtr, 70, 1.2);
+			else
+			{
+				float stdDev;
+				int neighbours;
+				cout << "set stdDev, default is " << 1.20 << endl; //1
+				cin >> stdDev;
+				cout << "set neighbours, default is " << 70 << endl; //100
+				cin >> neighbours;
+				statisticalOutlierRemovalPCD(tempPCDPtr, neighbours, stdDev);
+			}
+			cout_messages("--OutlierRemoval done");
 #endif
-
+#ifdef debugPCD
+			showPCD(tempPCDPtr, 1);
+#endif
+			cout_messages("save it?(n or y)");
+			input_string = "";
+			while (input_string != "y" && input_string != "n")	cin >> input_string;
+		} while (input_string == "n");
+		pcdThis = tempPCDPtr;
+/*
 #ifdef downsampleSRC
 		downsamplePCD(pcdThis, downsampleRate_SRC);
 		cout_messages("downsamplePCD done");
@@ -799,10 +858,11 @@ int main()
 		cout_messages("smoothingPCD done");
 		showPCD(pcdThis, 1);
 #endif
+*/
 
 #ifdef SIP_saveFiltered
-		pcl::io::savePCDFileASCII("PCDs/input/inputF_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *pcdThis);
-		cout_messages("SavingInFPCD done");
+		pcl::io::savePCDFileASCII("PCDs/input_finish/input_rNaN_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *pcdThis);
+		cout_messages("SavingIn_rNaNPCD done");
 #endif
 
 		//Align PCD
@@ -811,57 +871,130 @@ int main()
 		{
 			//Register PCD
 			PCDPtr temp(new PCD), result(new PCD);
+			PCDPtr tempresult(new PCD), tempFinalResult(new PCD);
 			Eigen::Matrix4f pairTransform;
 			Eigen::Matrix4f GlobalTransform = Eigen::Matrix4f::Identity();
-			alignPCD(pcdBefore, pcdThis, temp, pairTransform);
-			cout_messages("alignPCD done");
-			//transform current pair into the global transform
-			pcl::transformPointCloud(*temp, *result, GlobalTransform);
-			cout_messages("result done");
-#ifdef SAP_saveResult
-			pcl::io::savePCDFileASCII("PCDs/output/outputRes_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *result);
-			cout_messages("SavingOutFPCD done");
-#endif
-#ifdef outlierRemovalRES
-			statisticalOutlierRemovalPCD(result, 20, 1);
-#endif
-			//update the global transform
-			GlobalTransform = GlobalTransform * pairTransform;
-			//Visualize align result
-			*finalResult += *result;
-			cout_messages("finalResult done");
+			Eigen::Matrix4f tempGlobalTransform;
+			do
+			{
+				do
+				{
 
-#ifdef SAP_saveOriginal
-			pcl::io::savePCDFileASCII("PCDs/output/outputN_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
-			cout_messages("SavingOutNPCD done");
+					if (input_string == "y")
+						alignPCD(pcdBefore, pcdThis, temp, pairTransform);
+					else
+					{
+						float precision;
+						float iterCount;
+						cout << "set ICP precision, default is " <<ICP_Precision<< endl;
+						cin >> precision;
+						cout << "set ICP iter count, default is " << ICP_IterNum << endl;
+						cin >> iterCount;
+						alignPCD(pcdBefore, pcdThis, temp, pairTransform, precision, iterCount);
+					}
+					cout_messages("---AlignPCD done");
+					//transform current pair into the global transform
+					pcl::transformPointCloud(*temp, *result, GlobalTransform);
+					cout_messages("---Result done");
+#ifdef debugPCD
+					showPCD(result, 1);
 #endif
+					cout_messages("save it?(n or y)[smoothing is next step]");
+					input_string = "";
+					while (input_string != "y" && input_string != "n")	cin >> input_string;
+				} while (input_string == "n"); //align
+#ifdef SAP_saveResult
+				pcl::io::savePCDFileASCII("PCDs/output_finish/outputRes_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *result);
+				cout_messages("SavingOutFPCD done");
+#endif
+/*
+#ifdef outlierRemovalRES
+				statisticalOutlierRemovalPCD(result, 20, 1);
+#endif
+*/
+#ifdef smoothingRES
+				string skip_smooth = "n";
+				*tempresult = *result;
+				do
+				{
+					cout << "skip smoothing?(n or y)" << endl;
+					cin >> skip_smooth;
+					if (skip_smooth == "n")
+					{
+						if (input_string == "y")
+							smoothingPCD(tempresult, searchRAD_RES);
+						else
+						{
+
+							*tempresult = *result;
+							float rad_res;
+							cout << "set smoothing search radious, default is " << searchRAD_RES << endl;
+							cin >> rad_res;
+							smoothingPCD(tempresult, rad_res);
+						}
+						cout_messages("----SmoothingPCD done");
+#ifdef debugPCD
+						showPCD(tempresult, 1);
+#endif
+						cout_messages("accept the result?(n or y)");
+						input_string = "";
+						while(input_string != "y" && input_string != "n")	cin >> input_string;
+					}
+				} while (input_string != "y" && skip_smooth != "y"); //smoothing
+#endif
+				*result = *tempresult;
+				//update the global transform
+				tempGlobalTransform = GlobalTransform * pairTransform;
+				//Visualize align result
+				*tempFinalResult = *finalResult + *result;
+				cout_messages("----FinalResult done");
+#ifdef debugPCD
+				showPCD(tempFinalResult, 1);
+				//			showPCD(finalResult, 2);
+#endif
+				cout_messages("save it?(n or y)[or back to icp]");
+				input_string = "";
+				while (input_string != "y" && input_string != "n")	cin >> input_string;
+			} while (input_string == "n"); //fusing pcds
+
+			GlobalTransform = tempGlobalTransform;
+			*finalResult = *tempFinalResult;
 
 #ifdef downsampleRES
-			downsamplePCD(finalResult, downsampleRate_RES);
-			cout_messages("downsamplePCD done");
+			do
+			{
+				*tempFinalResult = *finalResult;
+				if (input_string == "y")
+					downsamplePCD(tempFinalResult, downsampleRate_RES);
+				else
+				{
+					float downsample;
+					cout << "set Downsample Rate, default is " << downsampleRate_RES<< endl;
+					cin >> downsample;
+					downsamplePCD(tempFinalResult, downsample);
+				}
+				cout_messages("----DownsamplePCD done");
+#ifdef debugPCD
+				showPCD(tempFinalResult, 1);
+				//			showPCD(finalResult, 2);
 #endif
-
-
-#ifdef smoothingRES
-			smoothingPCD(finalResult, searchRAD_RES);
-			cout_messages("smoothingPCD done");
+				cout_messages("save it?(n or y)");
+				input_string = "";
+				while (input_string != "y" && input_string != "n")	cin >> input_string;
+			} while (input_string == "n"); //downsampling fused
 #endif
-
+			*finalResult = *tempFinalResult;
 #ifdef SAP_saveFiltered
-			pcl::io::savePCDFileASCII("PCDs/output/outputF_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
+			pcl::io::savePCDFileASCII("PCDs/output_finish/output_final_PCD_" + std::to_string(loader_iter - ITERATOR_MIN) + ".pcd", *finalResult);
 			cout_messages("SavingOutFPCD done");
 #endif
 
-			//show result
 #ifdef debugPCD
-			//showPCD(result, 1);
 			showPCD(finalResult, 2);
 #endif
+			//show result
+
 		}
-#endif
-		//Show some pcds
-#ifdef debugPCD
-		cout_messages("show..");
 #endif
 
 			//-------------kibaszott meres ------------------------//
@@ -883,7 +1016,7 @@ int main()
 #endif
 
 		std::cout << "Picture number: " << loader_iter-ITERATOR_MIN<< std::endl;
-		loader_iter++;
+			loader_iter++;
 	}
 
 	//join visualizing threads
@@ -913,7 +1046,13 @@ int main()
 #else
 int main() 
 {
+	std::string workpath, depth_name, amplitude_name;
+	imgPath(&workpath, &depth_name, &amplitude_name);
+
+	int loader_iter = ITERATOR_MIN;
+
 	PCDPtr testSubject(new PCD), testOutput(new PCD);
+	PCDPtr testThis(new PCD), testBefore(new PCD);
 	int iterator = 1;
 #ifdef debugPCD
 #if shownWindowsNum > 0
@@ -926,26 +1065,24 @@ int main()
 	boost::thread workerThreadC(visualizeC);
 #endif
 #endif
+
 	while(1)
 	{
 		string a;
-		cout << "Test" << iterator << endl;
-		pcl::io::loadPCDFile("PCDs/output/outputRes_PCD_" + std::to_string(iterator) + ".pcd", *testSubject);
-		if (testSubject->size() == 0)
+		cout << "gimme a numba" << endl;
+		do
 		{
-			cout << "Test" << iterator << "failed" << endl<< "Write stg nice"<<endl;
-			cin >> a;
-			return 0;
-		}
-		cout << "Before test:"<<endl;
-		showPCD(testSubject, 1);
- 		*testOutput = *testSubject;
-		statisticalOutlierRemovalPCD(testSubject, 30, 1.0);
-		showPCD(testSubject, 2);
-		cout << "After test:" << endl;
+			cin >> iterator;
+		} while (iterator < 1);
+		cv::Mat depth_image, rgb_img;
+		//Load
 
-		cout << "PCDPtr size:" << testSubject->size() << endl;
-		iterator++;
+		cout << "Test" << iterator << endl;
+		pcl::io::loadPCDFile("PCDs/output/outputF_PCD_" + std::to_string(iterator) + ".pcd", *testThis);
+		cout << "PCDthis loaded" << endl;
+		downsamplePCD(testThis, 0.03);
+		showPCD(testThis, 1);
+		//iterator++;
 	}
 #ifdef debugPCD
 #if shownWindowsNum > 0

@@ -129,7 +129,7 @@ PCDPtr DepthToPCD(cv::Mat in, int depth_unit, float vert_viewing_angle, float ho
 		for (int x = 0; x < in.cols; x++)
 		{
 			depth = in.at<float>(y, x) / depth_unit;
-			if (depth <= 0.0f)
+			if (depth <= 0.000000000000001f)
 			{
 				p.x = p.y = p.z = std::numeric_limits<float>::quiet_NaN();
 			}

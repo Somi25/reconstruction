@@ -17,22 +17,22 @@ typedef unsigned long long pop_t;
 //FUNCTION OPTIONS---------
 
 //#define TESTING_ON
-//#define resizeSRC
+#define resizeSRC
 #define addFilters
-//#define SIP_saveOriginal
+#define SIP_saveOriginal
 #define removeNAN
 #define outlierRemovalSRC
 //#define downsampleSRC
 //#define smoothingSRC
-//#define SIP_saveFiltered
+#define SIP_saveFiltered
 #define addAlign
-#define addMeasurement
+//#define addMeasurement
 
 //functions followups
 #if 1
 #ifdef addFilters
-	#define useHoleFill
-	//#define useMedian
+	//#define useHoleFill
+	#define useMedian
 	//#define useGaussian	
 	//#define useCrop
 
@@ -40,7 +40,7 @@ typedef unsigned long long pop_t;
 #define medianKERNEL 5
 #endif
 #ifdef useHoleFill
-#define holeFillKERNEL 5
+#define holeFillKERNEL 3
 #endif
 #endif
 #ifdef downsampleSRC
@@ -51,36 +51,25 @@ typedef unsigned long long pop_t;
 #endif
 #ifdef addAlign
 	#define ICP_IterNum 60
-	#define ICP_Precision 1e-8
-	//#define SAP_saveResult //result of matching the 2 pcds
-	//#define SAP_saveOriginal
-	#define downsampleRES
+	#define ICP_Precision 1e-6
+	#define SAP_saveResult //result of matching the 2 pcds
+	#define SAP_saveOriginal
+	#define smoothingRES
 	//#define outlierRemovalRES
-	//#define smoothingRES
-	//#define SAP_saveFiltered
+	#define downsampleRES
+	#define SAP_saveFiltered
 
 #if (!(defined smoothingRES) && !(defined downsampleRES))
 #undef SAP_saveFiltered
 #endif
 #ifdef downsampleRES
-	#define downsampleRate_RES 0.03
+	#define downsampleRate_RES 0.1
 #endif
 #ifdef smoothingRES
-	#define searchRAD_RES 0.5
+	#define searchRAD_RES 0.2
 #endif
 #endif
 
-#ifdef TESTING_ON
-#undef resizeSRC
-#undef addFilters
-#undef SIP_saveOriginal
-#undef removeNAN
-#undef downsampleSRC
-#undef smoothingSRC
-#undef SIP_saveFiltered
-#undef addAlign
-#undef addMeasurement
-#endif
 #endif
 //-------------------------
 
